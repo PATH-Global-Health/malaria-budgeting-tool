@@ -9,7 +9,7 @@ tab4UI <- function(id) {
     # User input selections grouped into a card
     card(
       card_header("User Inputs"),
-      card_body_fill(
+      card_body(
         layout_column_wrap(
 
           # Plan Selection

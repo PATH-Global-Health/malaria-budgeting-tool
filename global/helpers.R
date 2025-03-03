@@ -5,9 +5,11 @@
 
 #-Leaflet intervention mix map--------------------------------------------------
 create_intervention_leaflet <- function(lga_outline, state_outline,
-                                           country_outline, intervention_mix_maps,
-                                           center_lng = 9, center_lat = 4,
-                                           zoom = 5.2) {
+                                        country_outline, intervention_mix_maps,
+                                        spatial_scale, state_select,
+                                        lga_select,
+                                        center_lng = 9, center_lat = 4,
+                                        zoom = 5.2) {
 
   # Define color palette based on unique values in intervention_summary
   color_pal <- colorFactor(
@@ -15,8 +17,16 @@ create_intervention_leaflet <- function(lga_outline, state_outline,
     domain = unique(intervention_mix_maps$intervention_summary)
   )
 
-  leaflet() %>%
-    addTiles() %>%
+  # Highlight option if State or LGA is selected
+  if (spatial_scale == "State") {
+     single_highlight <- state_outline %>% filter(state == state_select)
+  }
+  if (spatial_scale == "LGA") {
+     single_highlight <- lga_outline %>% filter(state == state_select, lga == lga_select)
+  }
+
+  map <- leaflet()  |>
+    addTiles() |>
     # Add LGA polygons with color based on intervention_summary
     addPolygons(
       data = intervention_mix_maps,
@@ -40,7 +50,7 @@ create_intervention_leaflet <- function(lga_outline, state_outline,
         style = list("font-weight" = "normal", "padding" = "3px 8px"),
         sticky = TRUE
       )
-    ) %>%
+    )  |>
     # Add state boundaries
     addPolygons(
       data = state_outline,
@@ -48,7 +58,7 @@ create_intervention_leaflet <- function(lga_outline, state_outline,
       color = "black",
       weight = 2,
       options = pathOptions(interactive = FALSE)
-    ) %>%
+    )  |>
     # Add national boundaries
     addPolygons(
       data = country_outline,
@@ -56,7 +66,7 @@ create_intervention_leaflet <- function(lga_outline, state_outline,
       color = "black",
       weight = 2,
       options = pathOptions(interactive = FALSE)
-    ) %>%
+    )  |>
     # Add legend (pass the values argument to color_pal)
     addLegend(
       pal = color_pal,
@@ -64,32 +74,90 @@ create_intervention_leaflet <- function(lga_outline, state_outline,
       title = "Intervention Mix",
       position = "bottomright",
       opacity = 0.7
-    ) %>%
+    )  |>
     setView(lng = center_lng, lat = center_lat, zoom = zoom)
+
+
+  if (spatial_scale %in% c("State", "LGA")) {
+
+    map <- map |>
+      addPolylines(
+      data = single_highlight,
+      color = "red",
+      weight = 3,
+      opacity = 1,
+      group = "highlight"
+    )
+  }
+
+  map
+
 }
 
 #-Static Facet intervention maps------------------------------------------------
 create_static_map <- function(lga_outline, state_outline, filtered_data,
-                              plan_select, year_value) {
+                              plan_select, year_value,
+                              spatial_scale,
+                              state_select,
+                              lga_select) {
 
-  static_data <-  filtered_data
+   p <- NULL  # Initialize plot variable
 
-  ggplot() +
-    geom_sf(data = lga_outline, fill = "grey90", col = "grey", alpha = 0.5) +
-    geom_sf(data = static_data, aes(fill = intervention_type, col = intervention_type), alpha = 0.6) +
-    geom_sf(data = state_outline, fill = NA, linewidth = 0.7, color = "black") +
-    scale_fill_brewer(palette = "Spectral", direction = -1) +
-    scale_color_brewer(palette = "Spectral", direction = -1) +
-    theme_void(base_size = 14) +
-    facet_wrap(vars(intervention)) +
-    theme(
-      legend.position = "bottom",
-        ) +
-    labs(
-      fill = "Intervention Class (if specified)",
-      col = "Intervention Class (if specified)",
-      title = paste0("Intervention mix for: ", plan_select, " - ", year_value)
-    )
+  if (spatial_scale == "National") {
+    static_data <- filtered_data
+    p <- ggplot() +
+      geom_sf(data = lga_outline, fill = "grey90", col = "grey", alpha = 0.5) +
+      geom_sf(data = static_data, aes(fill = intervention_type, col = intervention_type), alpha = 0.6) +
+      geom_sf(data = state_outline, fill = NA, linewidth = 0.7, color = "black") +
+      scale_fill_brewer(palette = "Spectral", direction = -1) +
+      scale_color_brewer(palette = "Spectral", direction = -1) +
+      theme_void(base_size = 14) +
+      facet_wrap(vars(intervention)) +
+      theme(legend.position = "bottom") +
+      labs(
+        fill = "Intervention Class (if specified)",
+        col = "Intervention Class (if specified)",
+        title = paste0("Intervention mix for: ", plan_select, " - ", year_value)
+      )
+  } else if (spatial_scale == "State" & !is.null(state_select)) {
+    state_highlight <- state_outline |> dplyr::filter(state == state_select)
+    static_data <- filtered_data
+    p <- ggplot() +
+      geom_sf(data = lga_outline, fill = "grey90", col = "grey", alpha = 0.5) +
+      geom_sf(data = static_data, aes(fill = intervention_type, col = intervention_type), alpha = 0.6) +
+      geom_sf(data = state_outline, fill = NA, linewidth = 0.7, color = "black") +
+      geom_sf(data = state_highlight, fill = NA, linewidth = 1, color = "red") +
+      scale_fill_brewer(palette = "Spectral", direction = -1) +
+      scale_color_brewer(palette = "Spectral", direction = -1) +
+      theme_void(base_size = 14) +
+      facet_wrap(vars(intervention)) +
+      theme(legend.position = "bottom") +
+      labs(
+        fill = "Intervention Class (if specified)",
+        col = "Intervention Class (if specified)",
+        title = paste0("Intervention mix for: ", plan_select, " - ", year_value)
+      )
+  } else if (spatial_scale == "LGA" & !is.null(lga_select)) {
+    lga_highlight <- lga_outline |> dplyr::filter(state == state_select, lga == lga_select)
+    static_data <- filtered_data
+    p <- ggplot() +
+      geom_sf(data = lga_outline, fill = "grey90", col = "grey", alpha = 0.5) +
+      geom_sf(data = static_data, aes(fill = intervention_type, col = intervention_type), alpha = 0.6) +
+      geom_sf(data = state_outline, fill = NA, linewidth = 0.7, color = "black") +
+      geom_sf(data = lga_highlight, fill = NA, linewidth = 1, color = "red") +
+      scale_fill_brewer(palette = "Spectral", direction = -1) +
+      scale_color_brewer(palette = "Spectral", direction = -1) +
+      theme_void(base_size = 14) +
+      facet_wrap(vars(intervention)) +
+      theme(legend.position = "bottom") +
+      labs(
+        fill = "Intervention Class (if specified)",
+        col = "Intervention Class (if specified)",
+        title = paste0("Intervention mix for: ", plan_select, " - ", year_value)
+      )
+  }
+
+  return(p)  # Explicitly return the ggplot object
 }
 
 #-Ribbon icons function---------------------------------------------------------
@@ -156,7 +224,7 @@ create_icon_summaries <- function(plan_select, year_select,
             " Total Population"
           )
         ),
-        card_body_fill(
+        card_body(
           h3(formatC(data$pop_total, format = "d", big.mark = ","), style = "font-weight: bold;"),
           p("People")
         ),
@@ -170,7 +238,7 @@ create_icon_summaries <- function(plan_select, year_select,
             " Population u5"
           )
         ),
-        card_body_fill(
+        card_body(
           h3(formatC(data$pop_0_5,
                      format = "d",
                      big.mark = ","),
@@ -187,7 +255,7 @@ create_icon_summaries <- function(plan_select, year_select,
             " Pregnant Women"
           )
         ),
-        card_body_fill(
+        card_body(
           h3(formatC(data$pop_pw,
                      format = "d", big.mark = ","), style = "font-weight: bold;"),
           p("Women")
@@ -202,7 +270,7 @@ create_icon_summaries <- function(plan_select, year_select,
             " Total Budget"
           )
         ),
-        card_body_fill(
+        card_body(
           h4(paste0(currency_symbol,
                     formatC(as.numeric(data$total_budget),
                             format = "f", digits = 0, big.mark = ","))),
@@ -218,7 +286,7 @@ create_icon_summaries <- function(plan_select, year_select,
             " Cost Per Person"
           )
         ),
-        card_body_fill(
+        card_body(
           h4(paste0(currency_symbol,
                     formatC(as.numeric(data$total_budget_per_person),
                             format = "f", digits = 2, big.mark = ","))),
@@ -778,48 +846,66 @@ cost_dist_map <- function(map_level,
                           plan_select,
                           currency_select,
                           map_type,
-                          year_select ) {
-
-  # format dataset (Need state or LGA level based on input)
+                          year_select,
+                          state_select = NULL,
+                          lga_select = NULL) {
+  # Format dataset based on map_level
   if(map_level == "State"){
     data <-
       state_budget |>
-      select(plan_shortname, adm0, adm1, total_budget, currency, year, total_budget_per_person) |>
-      filter(currency == currency_select,
-             plan_shortname == plan_select)
-
-  }else if(map_level == "LGA"){
+      dplyr::select(plan_shortname, adm0, adm1, total_budget, currency, year, total_budget_per_person) |>
+      dplyr::filter(currency == currency_select,
+                    plan_shortname == plan_select)
+  } else if(map_level == "LGA"){
     data <-
       lga_budget |>
-      select(plan_shortname, adm0, adm1, adm2, currency, year, total_budget, total_budget_per_person) |>
-      filter(currency == currency_select,
-             plan_shortname == plan_select)
+      dplyr::select(plan_shortname, adm0, adm1, adm2, currency, year, total_budget, total_budget_per_person) |>
+      dplyr::filter(currency == currency_select,
+                    plan_shortname == plan_select)
   }
 
-  # account for years selected
+  # Account for years selected
   if(year_select == 'All Years'){
-    data <-
-      data |>
-      dplyr::group_by(
-        plan_shortname,
-        adm0,
-        adm1,
-      ) |>
+    # Define the default grouping columns
+    group_cols <- c("plan_shortname", "adm0", "adm1")
+
+    # If adm2 exists in the dataset, add it to the grouping
+    if("adm2" %in% names(data)){
+      group_cols <- c(group_cols, "adm2")
+    }
+
+    data <- data |>
+      dplyr::group_by(across(all_of(group_cols))) |>
       dplyr::summarise(
-        total_cost = sum(total_cost, na.rm = TRUE),
+        total_budget = sum(total_budget, na.rm = TRUE),
         total_budget_per_person = sum(total_budget_per_person, na.rm = TRUE),
         .groups = "drop"
       )
-  } else {
-      data <-
-        data |>
-        filter(year == year_select)
-    }
+  }  else {
+    data <-
+      data |>
+      dplyr::filter(year == year_select)
+  }
 
-
-  # Determine which values to map
+  # Determine which values to map and the legend title
   values <- if(map_type  == "total") data$total_budget else data$total_budget_per_person
   title <- if(map_type == "total") "Total Cost" else "Cost per Person"
+
+  # Join with shapefiles
+  if(map_level == "State"){
+    data <-
+      state_outline |>
+      dplyr::left_join(data, by = c("state" = "adm1"))
+  } else if(map_level == "LGA"){
+    data <-
+      lga_outline |>
+      dplyr::left_join(data, by = c("state" = "adm1",
+                                    "lga" = "adm2"))
+  }
+
+  # Create label for each feature
+  label_title <-
+    if(map_level == "State") paste0(data$state, ":") else paste0(data$state, ", ", data$lga, ":")
 
   # Create color palette
   pal <- colorNumeric(
@@ -828,24 +914,8 @@ cost_dist_map <- function(map_level,
     reverse = TRUE
   )
 
-  # join with shapefiles
-  if(map_level == "State"){
-    data <-
-      state_outline |>
-      left_join(data, by=c("state" = "adm1"))
-  }else if(map_level == "LGA"){
-    data <-
-      lga_outline |>
-      left_join(data, by=c("state" = "adm1",
-                           "lga" = "adm2"))
-  }
-
-  # label item
-  label_title <-
-    if(map_level == "State") paste0(data$state, ":") else paste0(data$state, ", ", data$lga, ":")
-
-  # Create map
-  leaflet(data) %>%
+  # Build base map
+  map <- leaflet(data) %>%
     addProviderTiles(providers$CartoDB.Positron) %>%
     addPolygons(
       fillColor = ~pal(values),
@@ -859,7 +929,7 @@ cost_dist_map <- function(map_level,
         format_cost_label(
           if(map_type == "total") total_budget else total_budget_per_person,
           currency_select,
-          is_per_person = map_type == "per_person"
+          is_per_person = map_type == "per person"
         )
       )
     ) %>%
@@ -867,11 +937,40 @@ cost_dist_map <- function(map_level,
       position = "bottomright",
       pal = pal,
       values = values,
-      title = paste(title, "(",currency_select,")"),
+      title = paste(title, "(", currency_select, ")"),
       labFormat = labelFormat(
         prefix = if(currency_select == "USD") "$" else "₦"
       )
     )
+
+  # Add highlight if a state is selected and the map is at State level
+  if(map_level == "State" && !is.null(state_select)) {
+    state_hl <- state_outline %>% dplyr::filter(state == state_select)
+    map <- map %>%
+      addPolylines(
+        data = state_hl,
+        color = "red",
+        weight = 3,
+        opacity = 1,
+        group = "highlight"
+      )
+
+  }
+
+  # Add highlight if an LGA is selected and the map is at LGA level
+  if(map_level == "LGA" && !is.null(lga_select)) {
+    lga_hl <- lga_outline %>% dplyr::filter(state == state_select, lga == lga_select)
+    map <- map %>%
+      addPolylines(
+        data = lga_hl,
+        color = "red",
+        weight = 3,
+        opacity = 1,
+        group = "highlight"
+      )
+  }
+
+  map
 }
 
 format_cost_label <- function(value, currency_select, is_per_person = FALSE) {

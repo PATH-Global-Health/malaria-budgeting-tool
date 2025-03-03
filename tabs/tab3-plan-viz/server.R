@@ -83,13 +83,24 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
   #-Generate the interactive map-----------------------------------------------------------
   output$interactive_map <- renderLeaflet({
-    req(input$plan_select, input$year_select)
+    req(input$plan_select, input$spatial_scale)  # Wait until a spatial scale is chosen
+
+    if (input$spatial_scale == "State") {
+      req(input$plan_select, input$state_select)
+      # Filter state_outline based on state_selected
+    } else if (input$spatial_scale == "LGA") {
+      req(input$plan_select, input$state_selected, input$lga_select)
+      # Filter lga_outline based on state_selected and lga_selected
+    }
 
     create_intervention_leaflet(
       lga_outline = lga_outline,
       state_outline = state_outline,
       country_outline = country_outline,
       intervention_mix = filtered_intervention_mix(),
+      spatial_scale = input$spatial_scale,
+      state_select = input$state_select,
+      lga_select = input$lga_select,
       center_lng = 9,
       center_lat = 4,
       zoom = 5.2
@@ -112,6 +123,9 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           state_outline = state_outline,
           filtered_data = filtered_static_mix(),
           plan_select = input$plan_select,
+          spatial_scale = input$spatial_scale,
+          state_select = input$state_select,
+          lga_select = input$lga_select,
           year_value = y
         )
       })
@@ -219,7 +233,15 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
   })
 
   output$budget_table <- DT::renderDataTable({
-    req(input$plan_select, input$year_select, input$currency_select)
+    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    # For spatial scales that require a state selection, ensure input$state_select exists
+    if (input$spatial_scale %in% c("State", "LGA")) {
+      req(input$state_select)
+    }
+    # For LGA level, require an LGA selection
+    if (input$spatial_scale == "LGA") {
+      req(input$lga_select)
+    }
     # Your create_budget_table() function returns a DT datatable.
     create_budget_table(
       process_budget_data(
@@ -239,8 +261,15 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
    #-Donut chart--------------------
   output$donut_chart <- renderBillboarder({
 
-    req(input$plan_select, input$year_select, input$spatial_scale,
-        input$currency_select)
+    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    # For spatial scales that require a state selection, ensure input$state_select exists
+    if (input$spatial_scale %in% c("State", "LGA")) {
+      req(input$state_select)
+    }
+    # For LGA level, require an LGA selection
+    if (input$spatial_scale == "LGA") {
+      req(input$lga_select)
+    }
 
     donut_plot(
       process_budget_data(
@@ -257,8 +286,15 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
   #-Treemap chart----------------------
   output$treemap_chart <- renderPlotly({
 
-    req(input$plan_select, input$year_select, input$spatial_scale,
-        input$currency_select)
+    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    # For spatial scales that require a state selection, ensure input$state_select exists
+    if (input$spatial_scale %in% c("State", "LGA")) {
+      req(input$state_select)
+    }
+    # For LGA level, require an LGA selection
+    if (input$spatial_scale == "LGA") {
+      req(input$lga_select)
+    }
 
     treemap_plot(
       process_budget_data(
@@ -276,8 +312,15 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
   #-Stacked bar chart---------------------
   output$stacked_barchart <- renderPlotly({
 
-    req(input$plan_select, input$year_select, input$spatial_scale,
-        input$currency_select)
+    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    # For spatial scales that require a state selection, ensure input$state_select exists
+    if (input$spatial_scale %in% c("State", "LGA")) {
+      req(input$state_select)
+    }
+    # For LGA level, require an LGA selection
+    if (input$spatial_scale == "LGA") {
+      req(input$lga_select)
+    }
 
     stacked_plot(
       process_item_data(
@@ -295,8 +338,15 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
   #-lolipop chart---------------------------
   output$lolipop_chart <- renderPlotly({
 
-    req(input$plan_select, input$year_select, input$spatial_scale,
-        input$currency_select)
+    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    # For spatial scales that require a state selection, ensure input$state_select exists
+    if (input$spatial_scale %in% c("State", "LGA")) {
+      req(input$state_select)
+    }
+    # For LGA level, require an LGA selection
+    if (input$spatial_scale == "LGA") {
+      req(input$lga_select)
+    }
 
     lolipop_plot(
       process_item_data(
@@ -313,57 +363,77 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
   #-Map 1 - state total cost------------------
   output$state_total_map <- renderLeaflet({
+    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    if (input$spatial_scale %in% c("State", "LGA")) {
+      req(input$state_select)
+    }
 
-    req(input$plan_select, input$year_select, input$currency_select)
-
-     cost_dist_map(
-       map_level = "State",
-       plan_select = input$plan_select,
-       currency_select = input$currency_select,
-       map_type = "total",
-       year_select = input$year_select
-       )
+    cost_dist_map(
+      map_level = "State",
+      plan_select = input$plan_select,
+      currency_select = input$currency_select,
+      map_type = "total",
+      year_select = input$year_select,
+      state_select = input$state_select  # Pass selected state for highlighting
+    )
   })
 
   #-Map 2 - state pp cost------------------
   output$state_pp_map <- renderLeaflet({
-
-    req(input$plan_select, input$year_select, input$currency_select)
+    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    if (input$spatial_scale %in% c("State", "LGA")) {
+      req(input$state_select)
+    }
 
     cost_dist_map(
       map_level = "State",
       plan_select = input$plan_select,
       currency_select = input$currency_select,
       map_type = "per person",
-      year_select = input$year_select
+      year_select = input$year_select,
+      state_select = input$state_select
     )
   })
 
   #-Map 3 - lga total cost------------------
   output$lga_total_map <- renderLeaflet({
-
-    req(input$plan_select, input$year_select, input$currency_select)
+    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    if (input$spatial_scale %in% c("State", "LGA")) {
+      req(input$state_select)
+    }
+    if (input$spatial_scale == "LGA") {
+      req(input$lga_select)
+    }
 
     cost_dist_map(
       map_level = "LGA",
       plan_select = input$plan_select,
       currency_select = input$currency_select,
       map_type = "total",
-      year_select = input$year_select
+      year_select = input$year_select,
+      state_select = input$state_select,  # Needed to filter the LGA shapefile correctly
+      lga_select = input$lga_select         # Highlight the selected LGA
     )
   })
 
   #-Map 4 - lga pp cost------------------
   output$lga_pp_map <- renderLeaflet({
-
-    req(input$plan_select, input$year_select, input$currency_select)
+    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    if (input$spatial_scale %in% c("State", "LGA")) {
+      req(input$state_select)
+    }
+    if (input$spatial_scale == "LGA") {
+      req(input$lga_select)
+    }
 
     cost_dist_map(
       map_level = "LGA",
       plan_select = input$plan_select,
       currency_select = input$currency_select,
       map_type = "per person",
-      year_select = input$year_select
+      year_select = input$year_select,
+      state_select = input$state_select,
+      lga_select = input$lga_select
     )
   })
 

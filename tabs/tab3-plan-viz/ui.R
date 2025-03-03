@@ -10,7 +10,7 @@ tab3UI <- function(id) {
     # User input selections grouped into a card
     card(
       card_header("User Inputs"),
-      card_body_fill(
+      card_body(
         layout_column_wrap(
           width = 1/4, # Wrap items into four columns
 
@@ -19,8 +19,7 @@ tab3UI <- function(id) {
             ns("plan_select"),
             "Select the Plan:",
             choices = c("", unique_plans),
-            selected = "",
-            multiple = TRUE
+            selected = ""
           ),
 
           # Spatial Scale Selection
