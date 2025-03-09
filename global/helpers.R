@@ -559,42 +559,6 @@ process_item_data <- function(plan_select, year_select,
 }
 
 
-
-#-BUDGET TABLE----------------------------------------------------------------
-# create_budget_table <- function(processed_data, currency_select) {
-#
-#   col_names <- c(
-#     "Plan" = "plan_shortname",
-#     "Category" = "item_class",
-#     "Budget Item" = "title",
-#     "Total Cost" = "total_cost"
-#   )
-#
-#   # Determine the currency symbol
-#   currency_symbol <- if (currency_select == "USD") "$" else "₦"
-#
-#   DT::datatable(
-#     processed_data,
-#     options = list(
-#       pageLength = 10,
-#       scrollX = TRUE,
-#       dom = 'Bfrtip'
-#     ),
-#     rownames = FALSE,
-#     colnames = col_names
-#   ) |>
-#     DT::formatStyle(
-#       columns = 1:ncol(processed_data),
-#       fontSize = '14px'
-#     ) |>
-#     DT::formatCurrency(
-#       columns = "Total Cost",
-#       currency = currency_symbol,
-#       interval = 3,
-#       mark = ",",
-#       digits = 0
-#     )
-# }
 #-BUDGET TABLE WITH FORMATTING----------------------------------------------------------
 create_budget_table <- function(processed_data, currency_select, baseline_data = NULL) {
   # Define display column names.
@@ -620,12 +584,18 @@ create_budget_table <- function(processed_data, currency_select, baseline_data =
       dplyr::mutate(diff_flag = total_cost != baseline_total)
   }
 
+  # Identify columns to hide
+  hidden_cols <- which(names(processed_data) %in% c("baseline_total", "diff_flag")) - 1
+
   # Build the datatable.
   dt <- DT::datatable(
     processed_data,
     options = list(
       pageLength = 20,
-      scrollX = TRUE
+      scrollX = TRUE,
+      columnDefs = list(
+        list(targets = hidden_cols, visible = FALSE)  # Hide specified columns
+      )
     ),
     rownames = FALSE,
     colnames = col_names
@@ -1040,4 +1010,79 @@ budget_diff_chart <- function(data, currency_select){
 
 }
 
-#-c
+#-final cost plot-------------------------------------------------------------------------
+generate_final_cost_plot <- function(currency_select, year_select, spatial_scale = "National",
+                                     baseline_plan, comp_plans) {
+
+
+  # all plans
+  plan_select <- c(baseline_plan, comp_plans)
+
+
+  # Determine currency symbol
+  currency_symbol <- if (currency_select == "USD") "$" else "₦"
+
+  # Process data for selected plans using the same function as the tables
+  dat <- purrr::map_df(plan_select, function(plan) {
+    process_budget_data(
+      plan_select = plan,
+      year_select = year_select,
+      spatial_scale = spatial_scale,
+      state_select = NULL,
+      lga_select = NULL,
+      currency_select = currency_select
+    ) %>%
+      mutate(plan = plan)  # Ensure plan name is included
+  })
+
+  # Convert to millions for consistency with tables
+  dat <- dat %>%
+    mutate(
+      # title = factor(title, levels = rev(title)),  # Order interventions
+      # plan = str_to_title(plan),  # Capitalize plan names
+      total_cost = total_cost / 1e6,  # Convert to millions
+      tc_print = case_when(
+        currency_select == "NGN"  ~ paste0(currency_symbol, format(round(total_cost, 0), big.mark = ","), "m"),
+        currency_select == "USD" & total_cost > 60 ~ paste0(currency_symbol, format(round(total_cost, 0), big.mark = ","), "m"),
+        currency_select == "USD" & total_cost <= 60 & total_cost > 1 ~ paste0(currency_symbol, format(round(total_cost, 1), big.mark = ","), "m"),
+        currency_select == "USD" & total_cost <= 1 ~ paste0(currency_symbol, format(round(total_cost, 2), big.mark = ","), "m"),
+        is.na(total_cost) ~ paste0(currency_symbol, "0m")
+      ),
+      total_cost = ifelse(is.na(total_cost), 0, total_cost)
+    )
+
+  # Extract baseline data (Scenario 1) for comparison
+  baseline_data <- dat %>%
+    filter(plan == baseline_plan) %>%
+    select(title, total_cost) %>%
+    rename(baseline_total = total_cost)
+
+  # Merge baseline comparison data
+  dat <- dat %>%
+    left_join(baseline_data, by = "title") %>%
+    mutate(is_different = total_cost != baseline_total)
+
+  # Generate ggplot
+  ggplot(dat) +
+    geom_col(aes(x = total_cost, y = title, fill = plan)) +
+    geom_col(data = dat %>% filter(is_different, plan != baseline_plan),
+             aes(x = total_cost, y = title),
+             fill = NA,
+             color = "lightgreen",
+             size = 2) +
+    facet_wrap(vars(plan), ncol = 4, scales = "fixed") +
+    scale_fill_manual(values = ggthemes::canva_pal("Fun and tropical")(length(unique(dat$plan_shortname))))+
+    labs(
+      y = "",
+      x = paste0("Total Cost (in ", currency_symbol, " Million)")
+    ) +
+    geom_text(aes(x = total_cost + 10, y = title, label = tc_print),
+              size = 6, hjust = 0) +
+    theme_bw(16) +
+    theme(
+      strip.text = element_text(size = 14, face = "bold"),
+      axis.text.y = element_text(size = 14),
+      axis.text.x = element_text(size = 14),
+      legend.position = "none"
+    )
+}

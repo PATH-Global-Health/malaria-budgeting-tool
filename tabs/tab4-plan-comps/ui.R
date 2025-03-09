@@ -65,7 +65,10 @@ tab4UI <- function(id) {
     uiOutput(ns("budget_tables")),
 
     # Budget Tables comps
-    uiOutput(ns("budget_tables_comp"))
+    uiOutput(ns("budget_tables_comp")),
+
+    # Budget figure comp
+    uiOutput(ns("budget_item_plots"))
 
 
   )

@@ -86,6 +86,9 @@ tab4Server <-
       state_outline = state_outline,
       country_outline = country_outline,
       intervention_mix = filtered_intervention_mix,
+      spatial_scale = "National",
+      state_select =  NULL,
+      lga_select =  NULL,
       center_lng = 9,
       center_lat = 4,
       zoom = 5.2
@@ -170,6 +173,9 @@ tab4Server <-
           state_outline = state_outline,
           country_outline = country_outline,
           intervention_mix = filtered_data,
+          spatial_scale = "National",
+          state_select =  NULL,
+          lga_select =  NULL,
           center_lng = 9,
           center_lat = 4,
           zoom = 5.2
@@ -421,6 +427,35 @@ tab4Server <-
         )
       })
     }
+  })
+
+  #-BUDGET FIGURE------------------------------------------------------------------------------
+  output$final_cost_plot <- renderPlot({
+    req(input$plan_bl_select != "", comparison_shortnames(), input$year_select, input$currency_select)
+
+    generate_final_cost_plot(
+      currency_select = input$currency_select,
+      year_select = input$year_select,
+      spatial_scale = "National",
+      baseline_plan = baseline_shortname(),
+      comp_plans = comparison_shortnames()
+    )
+  })
+
+  output$budget_item_plots <- renderUI({
+    req(input$plan_bl_select != "", comparison_shortnames(), input$year_select, input$currency_select)
+    card(
+      card_header(
+        "Item Cost Comparisons",
+        tooltip(
+          shiny::icon("info-circle"),
+          "Comparison of total costs across selected plans by different budget items"
+        )
+      ),
+      card_body(
+        plotOutput(session$ns("final_cost_plot"), height = "600px")
+      )
+    )
   })
 
   }

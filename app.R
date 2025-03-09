@@ -77,10 +77,10 @@ ui <- page_fluid(
       nav_panel(title = tagList(icon("file-pdf"), "Report Generation"), value = "tab5"),
       nav_panel(title = tagList(icon("book"), "Methods"), value = "tab6")
     ),
-    # Add logo at the bottom
-    div(
-      style = "position: absolute; bottom: 0; width: 100%; text-align: left; padding: 10px;",
-      img(src = "PATH_Logo_Color.png", height = "50px", alt = "Company Logo")
+    # Add logos at the bottom
+    div(style = "position: absolute; bottom: 10px; width: 100%; text-align: center;",
+        img(src = "NMEP_logo.png", height = "60px", style = "margin-bottom: 10px;"),
+        img(src = "PATH_Logo_Color.png", height = "60px")
     )
   ),
 

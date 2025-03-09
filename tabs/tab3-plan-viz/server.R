@@ -451,7 +451,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
         title = "Proportional Cost Summaries",
         nav_panel(
           "Plot 1",
-          card_title("Proportion of total budget by item"),
+          card_title("Proportion of Total Budget by Item"),
           card_body(
             class = "p-0",
             billboarderOutput(session$ns("donut_chart"))
@@ -460,7 +460,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
         ),
         nav_panel(
           "Plot 2",
-          card_title("Treemap of budget items"),
+          card_title("Treemap of Budget Items"),
           card_body(
             class = "p-0",
             plotlyOutput(session$ns("treemap_chart"))
@@ -475,7 +475,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
                    that item (%).<br><br>The Treemap in panel Plot 2 displays
                    this information in another way, the size of the block for each
                    item is the relative contribution of that budget item to
-                   the total budget(%).<br><br> When State or LGA level
+                   the total budget.<br><br> When State or LGA level
                    information is displayed the Support Services costs are
                    not generated at this level only costs related to malaria
                    interventions are shown.")
@@ -511,10 +511,10 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           shiny::icon("circle-info"),
           markdown("Intervention specific total costs are shown spilt into data on the
                    cost category within each intervention (procurement, implementation
-                   and support services)(%).<br><br>The top 15 cost elements are then
+                   and support services).<br><br>The top 15 cost elements are then
                    displayed which highlight which specific line item of
                    the budget has the largest contribution to the overal
-                   budget estimate(%).<br><br> When State or LGA level
+                   budget estimate.<br><br> When State or LGA level
                    information is displayed the Support Services costs are
                    not generated at this level only costs related to malaria
                    interventions are shown.")
