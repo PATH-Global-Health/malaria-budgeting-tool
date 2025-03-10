@@ -43,9 +43,15 @@ tab5Server <- function(input, output, session) {
         stop("Template file not found: ", template_path)
       }
 
+      temp <- tempdir()
+
       # Copy the template to a temporary file location
-      tempReport <- file.path(tempdir(), "report_template.Rmd")
+      tempReport <- file.path(temp, "report_template.Rmd")
       file.copy(template_path, tempReport, overwrite = TRUE)
+
+      # Copy test figures to temporary file location
+      file.copy(file.path("global", "test.png"), file.path(temp, "test.png"))
+      file.copy(file.path("global", "test-2.png"), file.path(temp, "test-2.png"))
 
       # Determine the output format (currently fixed to Word)
       output_format <- "word_document"
@@ -59,7 +65,7 @@ tab5Server <- function(input, output, session) {
           report_title   = input$report_title,
           authors_list   = input$authors_list,
           plan_select    = input$plan_select,
-          year_value     = input$year_select,
+          year_select     = input$year_select,
           lga_outline    = lga_outline,
           state_outline  = state_outline,
           national_budget  = national_budget
@@ -74,7 +80,7 @@ tab5Server <- function(input, output, session) {
   #-Figures Download Handler--------------------------------------------------------------
   output$download_figures <- downloadHandler(
     filename = function() {
-      paste0("figures-", Sys.Date(), ".zip")
+      paste0("figures-", input$plan_select, "-", Sys.Date(), ".zip")
     },
     content = function(file) {
       withProgress(message = 'Generating Figures', value = 0, {
@@ -84,8 +90,15 @@ tab5Server <- function(input, output, session) {
         dir.create(tmp_dir)
 
         # Step 2: Generate the plots based on current inputs
+        # just using the static intervention map as an
+        # example
         incProgress(0.2, detail = "Generating plots")
-        plots <- generate_plots(input$plan_select, input$year_select, input$currency_select)
+        plots <-
+          generate_plots(
+            input$plan_select,
+            input$year_select,
+            input$currency_select
+            )
 
         # Step 3: Save each plot as a PNG file
         incProgress(0.2, detail = "Saving plots as PNG files")
@@ -116,15 +129,11 @@ tab5Server <- function(input, output, session) {
       paste0("data-", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      # For demonstration: create a dummy data frame.
-      data <- data.frame(
-        Plan = input$plan_select,
-        Year = input$year_select,
-        Currency = input$currency_select,
-        Value = runif(length(input$plan_select), 100, 500)
-      )
+      # Define the path to the existing file
+      existing_file <- "data/nga-demo-data-pre-processed/budgets-generated/combined-plan-budgets.xlsx"
 
-      writexl::write_xlsx(data, path = file)
+      # Copy the existing file to the requested download location
+      file.copy(existing_file, file)
     },
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )

@@ -5,20 +5,35 @@ generate_plots <- function(plan, year, currency) {
 
   library(ggplot2)
 
-  # Dummy plot 1
-  data1 <- data.frame(x = 1:10, y = rnorm(10))
-  plot1 <- ggplot(data1, aes(x, y)) +
-    geom_line() +
-    ggtitle(paste("Plan:", paste(plan, collapse = ", "),
-                  "| Year:", year,
-                  "| Currency:", currency))
+  mix_dat <-
+    static_mix_maps |>
+    filter(plan_shortname == "Plan A",
+           year == 2025)
 
-  # Dummy plot 2
-  data2 <- data.frame(x = 1:10, y = rnorm(10, mean = 5))
-  plot2 <- ggplot(data2, aes(x, y)) +
-    geom_point() +
-    ggtitle("Additional Plot Example")
+  # mixmap 1
+  plot1 <-
+    create_static_map(
+      lga_outline = lga_outline,
+      state_outline = state_outline,
+      filtered_data = mix_dat,
+      plan_select = "Plan A",
+      spatial_scale = "National",
+      state_select = NULL,
+      lga_select = NULL,
+      year_value = 2025
+  )
+
+  # total cost chart
+  plot2 <-
+    generate_final_cost_plot(
+      currency_select = currency,
+      year_select = year,
+      spatial_scale = "National",
+      baseline_plan = "Plan A",
+      comp_plans = NULL
+    )
+
 
   # Return a named list of plots
-  list(plot1 = plot1, plot2 = plot2)
+  list(mix_map = plot1, item_costs = plot2)
 }

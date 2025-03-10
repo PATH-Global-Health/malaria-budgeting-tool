@@ -1,0 +1,81 @@
+"resource","unit","ngn_cost","usd_cost","cost_year","source"
+"ITN Campaign-Procurement per ITN (Dual AI)","per ITN",5584.9688864,3.490605554,2024,"NMEP/GF"
+"ITN Campaign-Cost of distribution from State to LGA and from LGA to DHs","per bale",10000,6.25,2024,"NMEP"
+"ITN Campaign-Operational cost per ITN","per ITN",584,0.365,2024,"NMEP"
+"ITN Campaign-Storage of Hardwares","per year",8000000,5000,2024,"NMEP/GF"
+"ITN Routine Distribution-Pocurement cost per ITN (Dual AI)","per ITN",5584.9688864,3.490605554,2024,"NMEP"
+"ITN Routine Distribution-Operational cost per ITN","per ITN",1396.2422216,0.8726513885,2024,"NMEP"
+"IRS-Cost per LGA","per lGA",347858863000,217411789.375,2024,"NMEP"
+"LSM-Bti-Procurement cost per kg","per kg",102400,64,2024,"NMEP"
+"LSM-Operational cost per LGA","per LGA",35805000,22378.125,2024,"NMEP"
+"Malaria Vaccine-Procurement cost","per dose",6400,4,2024,"NPHCDA"
+"Malaria Vaccine-Operational cost","per child",1600,1,2024,"NPHCDA"
+"SMC-SPAQ-3-11 months-Procurement cost per SPAQ","per SPAQ",390,0.24375,2024,"NMEP"
+"SMC-SPAQ-12-59 months-Procurement cost per SPAQ","per SPAQ",435,0.271875,2024,"NMEP"
+"SMC-Campaign cost per child","per child",2128,1.33,2024,"NMEP"
+"PMC-SP-Procurement cost","per SP",327,0.204375,2024,"NMEP"
+"PMC-SP-Routine Distribution cost","per child",130,0.08125,2024,"NMEP"
+"IPTp-SP-Procurement cost per SP","per SP",808.929504,0.50558094,2024,"NMEP"
+"IPTp-SP-Routine Distribution cost","per SP",202.232376,0.126395235,2024,"NMEP"
+"Case Management-AL-Procurement cost per AL","per AL",1952,1.22,2024,"NMEP"
+"Case Management-AL-Routine Distribution cost per AL","per AL",488,0.305,2024,"NMEP"
+"Case Management-Artesunate injections-Procurement cost","per 60mg powder",3205,2.003125,2024,"NMEP"
+"Case Management-Artesunate injections-Routine Distribution cost","per 60mg powder",801.25,0.50078125,2024,"NMEP"
+"Case Management-Rectal Artesunate Suppositories (RAS)-Procurement cost per RAS","per RAS",703,0.439375,2024,"NMEP"
+"Case Management-RAS-Routine Distribution cost per RAS","per RAS",175.75,0.10984375,2024,"NMEP"
+"Case Management-RDT kits-Procurement cost per kit & consumables","per kit",740,0.4625,2024,"NMEP"
+"Case Management-RDT kits-Distribution cost per kit & consumables","per kit",185,0.115625,2024,"NMEP"
+"Case Management-EQA cost per state","per state",3622523,2264.076875,2024,NA
+"NHMIS Tools Printing-Cost per health facility","per facility",173564,108.4775,2024,NA
+"NHMIS Tools Distribution-Cost per LGA","per LGA",532494,332.80875,2024,"NMEP"
+"NMEP iMSV to States-Cost per State","per State",3213154,2008.22125,2024,"NMEP"
+"State and LGA M&E Activities-Cost per LGA","per LGA",4681778,2926.11125,2024,"NMEP"
+"NMEP Advocacy Visit to State Governors-Cost per state","per State",2850000,1781.25,2024,"NMEP"
+"Venue-Small hall-20 capacity in Abuja","per hall per day",NA,0,2024,NA
+"Venue-Medium size hall-50 capacity in Abuja","per hall per day",NA,0,2024,NA
+"Venue-Big hall-70 capacity in Abuja","per hall per day",NA,0,2024,NA
+"Venue-Auditorium in Abuja","per hall per day",NA,0,2024,NA
+"Venue-Small hall-20 capacity in state capital","per hall per day",NA,0,2024,NA
+"Venue-Medium size hall-50 capacity in state capital","per hall per day",NA,0,2024,NA
+"Venue-Big hall-70 capacity in state capital","per hall per day",NA,0,2024,NA
+"Venue-Auditorium in state capital","per hall per day",NA,0,2024,NA
+"Venue-Small hall-20 capacity in LGA","per hall per day",NA,0,2024,NA
+"Venue-Medium size hall-50 capacity in LGA","per hall per day",NA,0,2024,NA
+"Venue-Big hall-70 capacity in LGA","per hall per day",NA,0,2024,NA
+"Venue-Auditorium in LGA","per hall per day",NA,0,2024,NA
+"Training on malaria microscopy-Cost per person","per person",NA,0,2024,NA
+"Training/workshop documents/materials","per unit",NA,0,2024,NA
+"Photocopy of document-per page","per page",NA,0,2024,NA
+"Printing of document-per page","per page",NA,0,2024,NA
+"Printing of booklets-Unit cost","per unit",NA,0,2024,NA
+"Refreshments","per person per day",5000,3.125,2024,NA
+"Tea break-Abuja","per person per day",NA,0,2024,NA
+"Tea break-State capital","per person per day",NA,0,2024,NA
+"Tea break-LGA","per person per day",NA,0,2024,NA
+"Lunch-Abuja","per person per day",NA,0,2024,NA
+"Lunch-State capital","per person per day",NA,0,2024,NA
+"Lunch-LGA","per person per day",NA,0,2024,NA
+"DSA-Abuja","per person per night",NA,0,2024,NA
+"DSA-State capital","per person per night",NA,0,2024,NA
+"DSA-LGA","per person per night",NA,0,2024,NA
+"Stationery","per person",2000,1.25,2024,NA
+"Residential Workshop in Abuja-Cost per person per day","per person per day",274467,171.541875,2024,"NMEP"
+"Non-residential Workshop in Abuja-Cost per person per day","per person per day",97133,60.708125,2024,"NMEP"
+"Residential Workshop in State Capital-Cost per person per day","per person per day",141567,88.479375,2024,"NMEP"
+"Non-residential Workshop in State Capital-Cost per person per day","per person per day",86967,54.354375,2024,"NMEP"
+"Non-residential Workshop at LGA level-Cost per person per day","per person per day",83278,52.04875,2024,"NMEP"
+"Flight ticket-Return within Nigeria","per person",NA,0,2024,NA
+"Airport Taxi (x4)","per person",NA,0,2024,NA
+"Travel-Ground-per km","per person",NA,0,2024,NA
+"Transport within state capital","per person",7500,4.6875,2024,NA
+"Transport to and fro between LGAs and state capital","per person",15000,9.375,2024,NA
+"Transport within LGA","per person",5000,3.125,2024,NA
+"Advocacy kits","per kit",NA,0,2024,NA
+"Facilitation fee-National","per person per day",50000,31.25,2024,NA
+"Facilitation fee-State","per person per day",30000,18.75,2024,NA
+"Facilitation fee-LGA","per person per day",20000,12.5,2024,NA
+"Refreshments","per person per day",5000,3.125,2024,NA
+"Transport to and fro between LGAs and state capital","per person",15000,9.375,2024,NA
+"Facilitation fee-LGA","per person per day",20000,12.5,2024,NA
+"PMC-Cost per child per annum","per child",5232,3.27,NA,NA
+"Entomological Surveillance-Cost per state","per state",270769231,169230.77,NA,NA
