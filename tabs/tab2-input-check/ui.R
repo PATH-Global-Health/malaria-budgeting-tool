@@ -1,5 +1,6 @@
 tab2UI <- function(id) {
   ns <- NS(id)
+  
   fluidPage(
     titlePanel("Intervention Coverage by LGA"),
     h3("Plan and Intervention Analysis"),
@@ -7,25 +8,27 @@ tab2UI <- function(id) {
     # User input selections grouped into a card
     card(
       card_header("User Inputs"),
+      height = "auto",
+      min_height = "250px", # Increase minimum height for the card
       card_body_fill(
         layout_column_wrap(
           width = 1/3, # Wrap items into three columns
 
-          # Plan Selection - Add CSS to fix dropdown overflow
+          # Plan Selection
           div(
-            style = "position: relative; z-index: 1000;", # Higher z-index to ensure dropdown appears above other elements
+            style = "position: relative; z-index: 1002;", # Higher z-index
             selectInput(
               ns("plan_select"),
               "Select the Plan:",
               choices = c("", unique_plans2),
               selected = "",
-              multiple = FALSE # Changed to single selection for clarity
+              multiple = FALSE
             )
           ),
 
-          # Year Selection - Add CSS to fix dropdown overflow 
+          # Year Selection
           div(
-            style = "position: relative; z-index: 1000;", # Higher z-index
+            style = "position: relative; z-index: 1001;", # High z-index
             selectInput(
               ns("year_select"),
               "Select Years of Interest:",
