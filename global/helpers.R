@@ -1086,3 +1086,104 @@ generate_final_cost_plot <- function(currency_select, year_select, spatial_scale
       legend.position = "none"
     )
 }
+
+# Scenario check functions ----------
+
+# Function to count LGAs receiving and not receiving specific intervention by state and year
+count_lga_coverage <- function(intervention, plan, year_filter = NULL) {
+  # Get LGAs receiving intervention
+  receiving <- static_mix_maps |>
+    st_drop_geometry() |>
+    filter(intervention == !!intervention,
+           plan_shortname == !!plan)
+  
+  # Apply year filter if provided
+  if (!is.null(year_filter)) {
+    receiving <- receiving |>
+      filter(year %in% year_filter)
+  }
+  
+  receiving <- receiving |>
+    distinct(year, state, lga)
+
+  # Get total LGAs per state
+  total_lgas <- static_mix_maps |>
+    filter(plan_shortname == !!plan) |>
+    st_drop_geometry()
+  
+  # Apply year filter if provided
+  if (!is.null(year_filter)) {
+    total_lgas <- total_lgas |>
+      filter(year %in% year_filter)
+  }
+  
+  total_lgas <- total_lgas |>
+    distinct(year, state, lga)
+
+  # Calculate receiving and not receiving counts
+  total_lgas |>
+    group_by(year, state) |>
+    summarise(total = n_distinct(lga)) |>
+    left_join(
+      receiving |>
+        group_by(year, state) |>
+        summarise(receiving = n_distinct(lga)),
+      by = c("year", "state")
+    ) |>
+    mutate(
+      receiving = coalesce(receiving, 0),
+      not = total - receiving,
+      coverage_pct = round(receiving / total * 100, 1)
+    ) |>
+    select(Year = year,
+           State = state,
+           Total = total,
+           Covered = receiving,
+           Uncovered = not,
+           `Coverage %` = coverage_pct) |>
+    arrange(Year, State) |> 
+    ungroup()
+}
+
+smc_pmc_check <- function(plan, year_filter = NULL) {
+  # Which LGAs are receiving PMC each year
+  pmc_tmp <- static_mix_maps |>
+    st_drop_geometry() |>
+    filter(plan_shortname == !!plan,
+           intervention == "PMC") 
+    
+  # Apply year filter if provided
+  if (!is.null(year_filter) && length(year_filter) > 0 && !all(is.na(year_filter))) {
+    pmc_tmp <- pmc_tmp |>
+      filter(year %in% year_filter)
+  }
+  
+  pmc_tmp <- pmc_tmp |>
+    distinct(year, state, lga, intervention)
+
+  # Which LGAs are receiving SMC each year
+  smc_tmp <- static_mix_maps |>
+    st_drop_geometry() |>
+    filter(plan_shortname == !!plan,
+           intervention == "SMC")
+    
+  # Apply year filter if provided
+  if (!is.null(year_filter) && length(year_filter) > 0 && !all(is.na(year_filter))) {
+    smc_tmp <- smc_tmp |>
+      filter(year %in% year_filter)
+  }
+  
+  smc_tmp <- smc_tmp |>
+    distinct(year, state, lga, intervention)
+
+  # Complete join by year, state, and lga
+  smc_pmc <- inner_join(pmc_tmp, smc_tmp, by = c("year", "state", "lga")) |> 
+    select(year, state, lga)
+    
+  # If none return message within "None.", otherwise return all SMC and PMC data
+  if (nrow(smc_pmc) == 0) {
+    NULL
+  } else {
+    smc_pmc
+  }
+}

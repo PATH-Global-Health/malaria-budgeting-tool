@@ -188,4 +188,23 @@ plan_labels <- paste(unique_plans, "-", plan_descriptions)
 years_to_select <- unique(national_budget$year)
 plans_to_select <- plan_labels
 
+# Make a copy of "Plan A" called this "Plan Z", then add SMC to Aba North LGA in Abia State in 2025. 
+plan_z <- static_mix_maps |> 
+  filter(plan_shortname == "Plan A",) |> 
+  mutate(
+    plan_shortname = "Plan Z", 
+    plan_description = "Test SMC/PMC warning", 
+    plan_name = "Plan Z") |> 
+  add_row(
+    plan_shortname = "Plan Z",
+    plan_description = "Test SMC/PMC warning", 
+    year = 2025,
+    state = "Abia",
+    lga = "Aba North",
+    intervention = "SMC")
+#  Add plan Z to static mix maps
+static_mix_maps <- bind_rows(static_mix_maps, plan_z)
+
+# Extract unique plans and their descriptions, excluding 'baseline'
+unique_plans2 <- unique(static_mix_maps$plan_shortname)
 
