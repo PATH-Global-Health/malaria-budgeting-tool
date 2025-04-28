@@ -8,9 +8,9 @@ source("tabs/tab0-overview/server.R")
 source("tabs/tab1a-data-download/ui.R")
 source("tabs/tab1a-data-download/server.R")
 
-# source("tabs/tab1b-data-upload/ui.R")
-# source("tabs/tab1b-data-upload/server.R")
-#
+source("tabs/tab1b-data-upload/ui.R")
+source("tabs/tab1b-data-upload/server.R")
+
 source("tabs/tab2-input-check/ui.R")
 source("tabs/tab2-input-check/server.R")
 
