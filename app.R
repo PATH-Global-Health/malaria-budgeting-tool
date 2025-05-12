@@ -66,7 +66,7 @@ ui <- page_fluid(
   #-Sidebar Navigation------------------------------------
   div(
     class = "sidebar-container",
-    h3("Malaria CO-OP Tool"),
+    h3("Malaria Budget Comparison Tool"),
     tags$a(
       href = 'https://www.path.org/who-we-are/programs/malaria/malaria-control-and-elimination-partnership-in-africa-macepa/',
       icon("house"),
