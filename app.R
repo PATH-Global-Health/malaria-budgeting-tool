@@ -51,7 +51,7 @@ ui <- page_fluid(
         max-height: 400px;
         overflow-y: auto;
       }
-      
+
       /* Ensure dropdowns aren't constrained by parent containers */
       .dropdown-menu.show {
         position: absolute !important;
@@ -66,7 +66,7 @@ ui <- page_fluid(
   #-Sidebar Navigation------------------------------------
   div(
     class = "sidebar-container",
-    h3("Malaria CO-OP Tool"),
+    h3("Malaria Budget Comparison Tool"),
     tags$a(
       href = 'https://www.path.org/who-we-are/programs/malaria/malaria-control-and-elimination-partnership-in-africa-macepa/',
       icon("house"),
@@ -93,9 +93,9 @@ ui <- page_fluid(
       nav_panel(title = tagList(icon("book"), "Methods"), value = "tab6")
     ),
     # Add logo at the bottom
-    div(
-      style = "position: absolute; bottom: 0; width: 100%; text-align: left; padding: 10px;",
-      img(src = "PATH_Logo_Color.png", height = "50px", alt = "Company Logo")
+    div(style = "position: absolute; bottom: 10px; width: 100%; text-align: center;",
+        img(src = "NMEP_logo.png", height = "60px", style = "margin-bottom: 10px;"),
+        img(src = "PATH_Logo_Color.png", height = "60px")
     )
   ),
 

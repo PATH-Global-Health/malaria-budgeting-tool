@@ -6,7 +6,12 @@ output:
 params:
   report_title: "Test"    
   authors_list: "Test"
-  plan_select: "Test"                  
+  plan_select: "Test" 
+  currency_select: "Test" 
+  year_select: "Test"
+  lga_outline: "Test"
+  state_outline: "Test"
+  national_budget: "Test"                 
 ---
 
 **Authors:** `r params$authors_list`
@@ -23,80 +28,30 @@ The following plans are summarised in this document:
 
 -   `r paste(params$plan_select, collapse = "<br>")`
 
-## Methods  
+Costs are reported in `r params$currency_select`.
+
+## Methods
 
 *summarise methods used for budget generation including* *intervention quantification assumptions/ description of unit cost methodology generation/ conversion of unit cost to total budget*
 
 e.g. ITNs were quantified assuming 1.8 nets needed per person with a 10% buffer.
 
-## Results 
+...
+
+## Results
 
 In this section we will include key results from the budget generation process.
 
-E.g. 
+The following interventions were budgeted for the year 2025. (Figure 1). The associated cost of each intervention and support servics are shown in Figure 2. The total estimated budet needed for this plan is \$1.25 billion.
 
-```{r example,echo=FALSE}
-budget_barchart <- function(data, currency_select){
+![Figure 1. Intervention mix map.](test.png)
 
+![Figure 2. Item budget totals for Plan A](test-2.png)
 
-  currency_symbol <- if (currency_select == "USD") "$" else "₦"
-
-  data <-
-    data  |>
-    mutate(
-      budget_millions = round(total_budget / 1e6),
-      hover_text = paste0("Plan: ", plan_shortname, "<br>",
-                          "Total Cost: ", currency_symbol, format(budget_millions, big.mark = ","), "M")
-    )
-
-  p <-
-    ggplot(data, aes(x = plan_shortname, y = budget_millions, fill = plan_shortname, text = hover_text)) +
-    geom_bar(stat = "identity", width = 0.6) +
-    geom_text(aes(label = paste0(currency_symbol, format(budget_millions, big.mark = ","), "M")),
-              vjust = -0.5, size = 4) +
-    theme_minimal() +
-    labs(title = paste("Total Cost (", currency_select, " in Millions)"), x = "", y="") +
-    theme(text = element_text(size = 12)) +
-    scale_y_continuous(labels = scales::comma) +
-    guides(fill = "none") +
-    scale_fill_manual(values = ggthemes::canva_pal("Fun and tropical")(length(unique(data$plan_shortname))))
-
-
-  ggplotly(p, tooltip = "text") %>%
-    layout(hoverlabel = list(bgcolor = "white"))
-
-}
-
-dat <-
-      national_budget |>
-      filter(
-        currency == params$currency_select,
-        plan_shortname %in% c(params$plan_select)
-      ) |>
-      select(
-        plan_shortname,
-        plan_description,
-        year,
-        total_budget
-      )
-
-    if (input$year_select == "All Years") {
-      dat <- dat |>
-        group_by(
-          plan_shortname,
-          plan_description,
-         ) |>
-        dplyr::summarise(
-          total_budget = sum(total_budget, na.rm = TRUE)
-        )
-    } else {
-      dat <- dat |>
-        dplyr::filter(year == input$year_select)
-    }
-```
-
-
-
-## Key Considerations/ Limitations 
+## Key Considerations/ Limitations
 
 By design this process is challenging and some of these can be listed here..
+
+## References
+
+## Acknowledgements
