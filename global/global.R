@@ -26,6 +26,8 @@ library(shinyjs)
 library(writexl)
 library(webshot2)
 library(htmlwidgets)
+library(purrr)
+# library(openxlsx2)
 
 #-read in usable data-----------------------------------------------------------
 
@@ -130,6 +132,37 @@ dir.create("www", showWarnings = FALSE)
 # Sync databases on app startup
 sync_database("scenario")
 sync_database("cost")
+
+# Define the folder path
+scenario_folder <- "uploads/scenarios"
+
+# Get all .xlsx file paths
+scenario_files <- list.files(scenario_folder, pattern = "\\.xlsx$", full.names = TRUE)
+
+# Function to read all sheets from a single file and add 'year' column
+read_sheets_with_year <- function(file_path) {
+  sheet_names <- excel_sheets(file_path)
+
+  map_dfr(sheet_names, function(sheet) {
+    read_excel(file_path, sheet = sheet) %>%
+      mutate(year = as.numeric(sheet))  # assumes the sheet name is the year
+  })
+}
+
+# Read and combine all files/sheets
+scenario_data <- map_dfr(scenario_files, read_sheets_with_year)
+
+
+
+
+
+
+
+
+
+
+
+
 
 # create empty elements that will get filled by the tool
 intervention_mix_maps <- NULL
