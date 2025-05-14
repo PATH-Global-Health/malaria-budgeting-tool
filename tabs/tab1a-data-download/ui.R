@@ -12,7 +12,7 @@ tab1aUI <- function(id) {
         }
       ")
     ),
-  
+
     titlePanel("Data Download and Upload"),
     # h3("Content for Tab 1a goes here"),
     page_sidebar(
@@ -32,7 +32,7 @@ tab1aUI <- function(id) {
             tags$li("Download an existing file from the tables below")
           )
         ),
-        
+
         # Scenario Template Section
         card(
           "Scenario Template",
@@ -51,7 +51,7 @@ tab1aUI <- function(id) {
                        placeholder = "Add a description (optional)"),
           actionButton(ns("submit_scenario"), "Submit Scenario", class = "btn-primary")
         ),
-        
+
         # Cost Template Section
         card(
           "Cost Template",
@@ -67,18 +67,26 @@ tab1aUI <- function(id) {
           actionButton(ns("submit_cost"), "Submit Cost Sheet", class = "btn-primary")
         )
       ),
-      
+
       # Main panel content - stacked layout
       card(
         card_header("Previous Scenario Uploads"),
-        DTOutput(ns("scenario_uploads_table")),
-        height = "275px"
+        DTOutput(ns("scenario_uploads_table"))
+
       ),
       card(
         card_header("Previous Cost Uploads"),
-        DTOutput(ns("cost_uploads_table")),
-        height = "275px"
+        DTOutput(ns("cost_uploads_table"))
       )
-    )
+    ),
+
+    # Add JavaScript for delete confirmation
+    tags$script(HTML("
+    function deleteScenario(id) {
+      if (confirm('Are you sure you want to permanently delete this scenario?')) {
+        Shiny.setInputValue('delete_scenario', id);
+      }
+    }
+  "))
   )
 }

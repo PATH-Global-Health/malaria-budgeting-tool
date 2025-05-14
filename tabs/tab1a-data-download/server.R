@@ -8,8 +8,6 @@ tab1aServer <- function(input, output, session,
       }
     })
 
-
-  # Server logic for Tab 1
     # Initialize reactive values
     refresh_trigger <- reactiveVal(0)
 
@@ -634,54 +632,67 @@ tab1aServer <- function(input, output, session,
   })
 
     # Render tables for both Scenario and Cost uploads
-    output$scenario_uploads_table <- renderDT({
-      refresh_trigger()
+  output$scenario_uploads_table <- renderDT({
+    refresh_trigger()
 
-      db <- dbConnect(SQLite(), "scenario_uploads.db")
-      uploads <- dbGetQuery(db, "
-        SELECT id, name, description, filename, years, upload_date
-        FROM uploads
-        ORDER BY upload_date DESC
+    db <- dbConnect(SQLite(), "scenario_uploads.db")
+    uploads <- dbGetQuery(db, "
+    SELECT id, name, description, filename, years, upload_date
+    FROM uploads
+    ORDER BY upload_date DESC
+  ")
+    dbDisconnect(db)
+
+    if (nrow(uploads) > 0) {
+      # Add a delete button column with unique IDs for each button
+      uploads$actions <- paste0(
+        '<button class="btn btn-danger btn-sm delete-btn" data-id="', uploads$id, '">Delete</button>'
+      )
+
+      datatable(
+        uploads[, c("name", "description", "years", "upload_date", "actions")],
+        options = list(
+          pageLength = 5,
+          scrollY = "200px",
+          scrollCollapse = TRUE,
+          columnDefs = list(
+            list(targets = 4, orderable = FALSE)  # Make the actions column not sortable
+          )
+        ),
+        colnames = c("Name", "Description", "Years", "Upload Date", "Actions"),
+        selection = "none",
+        escape = FALSE,  # Important! Allows HTML in the table
+        callback = JS("
+        table.on('click', '.delete-btn', function() {
+          var id = $(this).data('id');
+          if (confirm('Are you sure you want to permanently delete this scenario? This action cannot be undone.')) {
+            Shiny.setInputValue('delete_scenario', id, {priority: 'event'});
+          }
+        });
       ")
-      dbDisconnect(db)
-
-      if (length(input$year_filter) > 0 && nrow(uploads) > 0) {
-        uploads$years_list <- strsplit(uploads$years, ",")
-        uploads <- uploads[sapply(uploads$years_list, function(years) {
-          any(input$year_filter %in% years)
-        }), ]
-        uploads$years_list <- NULL
-      }
-
-      if (nrow(uploads) > 0) {
-        datatable(
-          uploads[, c("name", "description", "years", "upload_date")],
-          options = list(
-            pageLength = 5,
-            scrollY = "200px",
-            scrollCollapse = TRUE
-          ),
-          colnames = c("Name", "Description", "Years", "Upload Date"),
-          selection = "none"
-        ) %>%
-          formatDate("upload_date")
-      } else {
-        datatable(
-          data.frame(
-            Name = character(),
-            Description = character(),
-            Years = character(),
-            "Upload Date" = character()
-          ),
-          options = list(
-            pageLength = 5,
-            scrollY = "200px",
-            scrollCollapse = TRUE
-          ),
-          selection = "none"
-        )
-      }
+      ) %>%
+        formatDate("upload_date")
+    } else {
+      datatable(
+        data.frame(
+          Name = character(),
+          Description = character(),
+          Years = character(),
+          "Upload Date" = character(),
+          Actions = character()
+        ),
+        options = list(
+          pageLength = 5,
+          scrollY = "200px",
+          scrollCollapse = TRUE
+        ),
+        selection = "none",
+        escape = FALSE
+      )
+    }
   })
+
+
 
 output$cost_uploads_table <- renderDT({
   refresh_trigger()
@@ -722,4 +733,7 @@ output$cost_uploads_table <- renderDT({
     )
   }
 })
+
+# Observe event delete data
+
 }
