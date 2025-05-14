@@ -2,9 +2,9 @@ tab4UI <- function(id) {
   ns <- NS(id)
   fluidPage(
     titlePanel("Plan Comparisons"),
-    h5("This tab allows the user to compare budget summaries directly for different plans. Start by selecting a 'Baseline' plan to compare against and filling in the remaining inputs. Budget comparisons are generated at the National Level only"),
+    ("This tab allows the user to compare budget summaries directly for different plans. Start by selecting a 'Baseline' plan to compare against and filling in the remaining inputs. Budget comparisons are generated at the National Level only"),
     br(),
-    h5("Data values are examples generated using evolving methodology and meant for demonstration and not decision making."),
+    ("Data values are examples generated using evolving methodology and meant for demonstration and not decision making."),
 
     # User input selections grouped into a card
     card(

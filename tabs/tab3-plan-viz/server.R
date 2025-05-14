@@ -1,5 +1,26 @@
 
-tab3Server <- function(input, output, session, lga_outline, state_outline, country_outline, intervention_mix_maps, static_mix_maps) {
+tab3Server <- function(input, output, session, lga_outline, state_outline, country_outline,
+                       intervention_mix_maps, static_mix_maps) {
+
+  #-check if data avaliable and add message if not-----------------------------------------------
+  data_ready <- reactive({
+    !is.null(intervention_mix_maps) && nrow(intervention_mix_maps) > 0 &&
+      !is.null(static_mix_maps) && nrow(static_mix_maps) > 0
+  })
+
+  observe({
+    if (!data_ready()) {
+      output$page_description <- renderUI({
+        card(
+          card_header("Budgets Not Yet Generated"),
+          card_body(
+            tags$p("Budgets not yet generated - return to the 'Generate Budgets' tab to specificy budget generation"),
+            tags$p("Once generated, return to this tab to view the generated budgets")
+          )
+        )
+      })
+    }
+  })
 
   #-Reactive: Filter intervention mix data based on selected plan--------------------------------
   filtered_intervention_mix <- reactive({
@@ -411,7 +432,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
       currency_select = input$currency_select,
       map_type = "total",
       year_select = input$year_select,
-      state_select = input$state_select,  # Needed to filter the LGA shapefile correctly
+      state_select = input$state_select,    # Needed to filter the LGA shapefile correctly
       lga_select = input$lga_select         # Highlight the selected LGA
     )
   })

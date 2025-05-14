@@ -3,7 +3,24 @@ tab4Server <-
            session, lga_outline,
            state_outline, country_outline, intervention_mix_maps) {
 
-  # Server logic for Tab 4
+  #-check if data avaliable and add message if not-----------------------------------------------
+   data_ready <- reactive({
+      !is.null(intervention_mix_maps) && nrow(intervention_mix_maps) > 0
+    })
+
+   observe({
+      if (!data_ready()) {
+        output$page_description <- renderUI({
+          card(
+            card_header("Budgets Not Yet Generated"),
+            card_body(
+              tags$p("Budgets not yet generated - return to the 'Generate Budgets' tab to specificy budget generation"),
+              tags$p("Once generated, return to this tab to view the generated budgets")
+            )
+          )
+        })
+      }
+    })
 
   #-UI selection for remaining plans---------------------------------------------------------
   output$remaining_plan_select <- renderUI({

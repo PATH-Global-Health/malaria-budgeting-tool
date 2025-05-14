@@ -1,6 +1,6 @@
 tab2UI <- function(id) {
   ns <- NS(id)
-  
+
   fluidPage(
     titlePanel("Intervention Coverage by LGA"),
     h3("Plan and Intervention Analysis"),
@@ -10,7 +10,7 @@ tab2UI <- function(id) {
       card_header("User Inputs"),
       height = "auto",
       min_height = "250px", # Increase minimum height for the card
-      card_body_fill(
+      card_body(
         layout_column_wrap(
           width = 1/3, # Wrap items into three columns
 
@@ -36,7 +36,7 @@ tab2UI <- function(id) {
               selected = ""
             )
           ),
-          
+
           # Clear button
           div(
             style = "display: flex; align-items: flex-end;",
@@ -50,13 +50,13 @@ tab2UI <- function(id) {
         )
       )
     ),
-    
+
     # PMC and SMC warning area
     uiOutput(ns("smc_pmc_warning")),
-    
+
     # Value boxes to show coverage statistics
     uiOutput(ns("coverage_summary")),
-    
+
     # Output card with tabs for each intervention
     uiOutput(ns("intervention_tabs"))
   )

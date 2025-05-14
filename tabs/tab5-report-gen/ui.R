@@ -3,9 +3,9 @@ tab5UI <- function(id) {
   fluidPage(
     useShinyjs(),
     titlePanel("Report and Data Downloads"),
-    h5("This tab allows users to download a report regarding the budgets generated and methods used to generate them, along with individual figure elements that can be seen in the tool and the raw budget data generated in excel format."),
+    ("This tab allows users to download a report regarding the budgets generated and methods used to generate them, along with individual figure elements that can be seen in the tool and the raw budget data generated in excel format."),
     br(),
-    h5("Data values are examples generated using evolving methodology and meant for demonstration and not decision making."),
+    ("Data values are examples generated using evolving methodology and meant for demonstration and not decision making."),
     br(),
 
     # Universal Settings Card
