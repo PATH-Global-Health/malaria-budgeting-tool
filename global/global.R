@@ -54,13 +54,13 @@ sync_database <- function(type = "scenario") {
   # Set paths and create directories if they don't exist
   upload_dir <- file.path("uploads", paste0(type, "s"))
   dir.create(upload_dir, recursive = TRUE, showWarnings = FALSE)
-  
+
   # Database file path
   db_file <- paste0(type, "_uploads.db")
-  
+
   # Connect to database
   db <- dbConnect(SQLite(), db_file)
-  
+
   # Create table if it doesn't exist
   if(type == "scenario") {
     dbExecute(db, "
@@ -86,21 +86,21 @@ sync_database <- function(type = "scenario") {
       )
     ")
   }
-  
+
   # Get list of actual files
   existing_files <- list.files(upload_dir, pattern = "\\.xlsx$")
-  
+
   # Get database records
   db_files <- dbGetQuery(db, "SELECT filename FROM uploads")$filename
-  
+
   # Remove records for files that no longer exist
   missing_files <- setdiff(db_files, existing_files)
   if(length(missing_files) > 0) {
     placeholders <- paste(rep("?", length(missing_files)), collapse = ",")
-    dbExecute(db, sprintf("DELETE FROM uploads WHERE filename IN (%s)", placeholders), 
+    dbExecute(db, sprintf("DELETE FROM uploads WHERE filename IN (%s)", placeholders),
              missing_files)
   }
-  
+
   dbDisconnect(db)
 }
 
@@ -131,80 +131,30 @@ dir.create("www", showWarnings = FALSE)
 sync_database("scenario")
 sync_database("cost")
 
-# intervention mix maps
-intervention_mix_maps <-
-  st_read("data/nga-demo-data-pre-processed/shapefiles/combined_interactive_map.shp") |>
-  select(-year) |>
-  distinct() |>
-  rename(intervention_summary = intrvn_,
-         plan_shortname = pln_shr,
-         plan_description = pln_dsc)
-
-# static intervention maps
-static_mix_maps <-
-  st_read("data/nga-demo-data-pre-processed/shapefiles/combined_static_map.shp") |>
-  rename(intervention = intrvnt,
-         intervention_type = intrvn_,
-         plan_shortname = pln_shr,
-         plan_description = pln_dsc) |>
-  mutate(intervention_type =
-           case_when(is.na(intervention_type) ~ "NA" ,
-                     TRUE ~ intervention_type))
+# create empty elements that will get filled by the tool
+intervention_mix_maps <- NULL
+static_mix_maps <- NULL
 
 # Shape files
 country_outline <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/country_shapefile.shp")
 state_outline   <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/state_shapefile_simp.shp")
 lga_outline     <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/lga_shapefile_simp.shp")
-
 state_outline$state[which(state_outline$state == "Akwa-Ibom")] <- "Akwa Ibom"
 
 # plan budget data
-national_budget <- read_xlsx("data/nga-demo-data-pre-processed/budgets-generated/combined-plan-budgets.xlsx",
-                             sheet = "National") |>
-  rename(irs_total_cost = irs_campaign_total_cost,
-         cm_private_total_cost = cm_private) |>
-  rename(gf_wd_malaria_long_haul_distribution_cost = gf_wd_malaria_long_haul_distribution,
-         gf_wd_malaria_warehouse_axial_cost = gf_wd_malaria_warehouse_axial,
-         gf_wd_malaria_warehouse_wib_cost = gf_wd_malaria_warehouse_wib)
+national_budget <- NULL
+state_budget    <- NULL
+lga_budget      <- NULL
 
-state_budget <- read_xlsx("data/nga-demo-data-pre-processed/budgets-generated/combined-plan-budgets.xlsx",
-                          sheet = "State")|>
-  rename(irs_total_cost = irs_campaign_total_cost,
-         cm_private_total_cost = cm_private)
-
-lga_budget <- read_xlsx("data/nga-demo-data-pre-processed/budgets-generated/combined-plan-budgets.xlsx",
-                          sheet = "LGA")|>
-  rename(irs_total_cost = irs_campaign_total_cost,
-         cm_private_total_cost = cm_private)
-
-# Extract unique plans and their descriptions, excluding 'baseline'
-unique_plans <- unique(national_budget$plan_shortname)
-plan_descriptions <- unique(national_budget$plan_description)
-
-# Combine plan and plan_description for checkbox labels
-plan_labels <- paste(unique_plans, "-", plan_descriptions)
+# Extract unique plans and their descriptions
+unique_plans      <- NULL
+plan_descriptions <- NULL
+plan_labels       <- NULL
 
 # values to use as the year input selection values
-years_to_select <- unique(national_budget$year)
-plans_to_select <- plan_labels
-
-# Make a copy of "Plan A" called this "Plan Z", then add SMC to Aba North LGA in Abia State in 2025. 
-plan_z <- static_mix_maps |> 
-  filter(plan_shortname == "Plan A",) |> 
-  mutate(
-    plan_shortname = "Plan Z", 
-    plan_description = "Test SMC/PMC warning", 
-    plan_name = "Plan Z") |> 
-  add_row(
-    plan_shortname = "Plan Z",
-    plan_description = "Test SMC/PMC warning", 
-    year = 2025,
-    state = "Abia",
-    lga = "Aba North",
-    intervention = "SMC")
-#  Add plan Z to static mix maps
-static_mix_maps <- bind_rows(static_mix_maps, plan_z)
+years_to_select <- NULL
+plans_to_select <- NULL
 
 # Extract unique plans and their descriptions, excluding 'baseline'
-unique_plans2 <- unique(static_mix_maps$plan_shortname)
+unique_plans2 <- NULL
 

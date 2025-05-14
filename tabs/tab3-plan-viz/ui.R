@@ -3,9 +3,9 @@ tab3UI <- function(id) {
   ns <- NS(id)
   fluidPage(
     titlePanel("Plan Visualization"),
-    h5("This tab provides key summaries of the generated budgets including tables and figures along with summary statistics. Outputs are populated once the user specifies each of the inputs below."),
+    ("This tab provides key summaries of the generated budgets including tables and figures along with summary statistics. Outputs are populated once the user specifies each of the inputs below."),
     br(),
-    h5("Data values are examples generated using evolving methodology and meant for demonstration and not decision making."),
+    ("Data values are examples generated using evolving methodology and meant for demonstration and not decision making."),
 
     # User input selections grouped into a card
     card(

@@ -16,7 +16,7 @@ options(scipen = 999)
 
 #-Define UI---------------------------------------------------------------------
 ui <- page_fluid(
-  theme = bs_theme(version = 5, bootswatch = "minty"),
+  theme = bs_theme(version = 5, bootswatch = "simplex"),
   useShinyjs(),
 
   # Add custom CSS for fixed full-height sidebar
@@ -67,26 +67,28 @@ ui <- page_fluid(
   div(
     class = "sidebar-container",
     h3("Malaria Budget Comparison Tool"),
-    tags$a(
-      href = 'https://www.path.org/who-we-are/programs/malaria/malaria-control-and-elimination-partnership-in-africa-macepa/',
-      icon("house"),
-      title = "Go to PATH Malaria Page"
-    ),
+    # tags$a(
+    #   href = 'https://www.path.org/who-we-are/programs/malaria/malaria-control-and-elimination-partnership-in-africa-macepa/',
+    #   icon("house"),
+    #   title = "Go to PATH Malaria Page"
+    # ),
+    # br(),
+    # actionLink("info", label = "", icon = icon("info"), title = "Info"),
+    # br(),
+    # tags$a(
+    #   href = "mailto:hthompson@path.org",
+    #   icon("comments"),
+    #   title = "Message Team"
+    # ),
+    # br(),
     br(),
-    actionLink("info", label = "", icon = icon("info"), title = "Info"),
-    br(),
-    tags$a(
-      href = "mailto:hthompson@path.org",
-      icon("comments"),
-      title = "Message Team"
-    ),
-    br(), br(),
     navset_pill_list(
       id = "sidebar_menu",
       widths = c(12, 1),
       nav_panel(title = tagList(icon("house"), "Overview"), value = "tab0"),
       nav_panel(title = tagList(icon("pen"), "User Inputs"), value = "tab1a"),
       nav_panel(title = tagList(icon("check"), "Check Scenario"), value = "tab2"),
+      nav_panel(title = tagList(icon("gear"), "Generate Budgets"), value = "tab2a"),
       nav_panel(title = tagList(icon("chart-bar"), "Plan Visualization"), value = "tab3"),
       nav_panel(title = tagList(icon("table-columns"), "Plan Comparisons"), value = "tab4"),
       nav_panel(title = tagList(icon("file-pdf"), "Report Generation"), value = "tab5"),
@@ -114,8 +116,8 @@ server <- function(input, output, session) {
     switch(input$sidebar_menu,
            "tab0" = tab0UI("tab0"),
            "tab1a" = tab1aUI("tab1a"),
-           # "tab1b" = tab1bUI("tab1b"),
            "tab2" = tab2UI("tab2"),
+           "tab2a"= tab2aUI("tab2a"),
            "tab3" = tab3UI("tab3"),
            "tab4" = tab4UI("tab4"),
            "tab5" = tab5UI("tab5"),
@@ -126,9 +128,8 @@ server <- function(input, output, session) {
   #=Call modules for each tab------------------------
   callModule(tab0Server, id = "tab0")
   callModule(tab1aServer, id = "tab1a", template_file_path, SCENARIO_COLS, COST_COLS, TEMPLATE_ADMIN_DATA)
-  # tab1aServer("tab1a")
-  # callModule(tab1bServer, id = "tab1b")
   callModule(tab2Server, id = "tab2", static_mix_maps)
+  callModule(tab2aServer, id = "tab2a")
   callModule(tab3Server, "tab3", lga_outline, state_outline, country_outline, intervention_mix_maps, static_mix_maps)
   callModule(tab4Server, id = "tab4", lga_outline, state_outline, country_outline, intervention_mix_maps)
   callModule(tab5Server, id = "tab5")

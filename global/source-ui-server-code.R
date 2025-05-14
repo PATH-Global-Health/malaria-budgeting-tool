@@ -14,6 +14,9 @@ source("tabs/tab1b-data-upload/server.R")
 source("tabs/tab2-input-check/ui.R")
 source("tabs/tab2-input-check/server.R")
 
+source("tabs/tab2a-generate-budgets/ui.R")
+source("tabs/tab2a-generate-budgets/server.R")
+
 source("tabs/tab3-plan-viz/ui.R")
 source("tabs/tab3-plan-viz/server.R")
 
