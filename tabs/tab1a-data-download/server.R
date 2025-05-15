@@ -1,5 +1,5 @@
 tab1aServer <- function(input, output, session,
-  template_file_path, SCENARIO_COLS, COST_COLS, TEMPLATE_ADMIN_DATA) {
+  template_file_path, SCENARIO_COLS, COST_COLS, TEMPLATE_ADMIN_DATA, shared) {
 
     # Template file path check
     observe({
@@ -9,7 +9,9 @@ tab1aServer <- function(input, output, session,
     })
 
     # Initialize reactive values
-    refresh_trigger <- reactiveVal(0)
+    refresh_trigger <- reactive({
+      shared$refresh_trigger
+    })
 
     # Helper functions
     calculate_file_hash <- function(file_path) {
@@ -25,6 +27,7 @@ tab1aServer <- function(input, output, session,
       })
     }
 
+    # Function to check for duplicate files
     is_duplicate_file <- function(hash, type = "scenario") {
       if (is.null(hash)) return(list(is_duplicate = FALSE))
       db_file <- paste0(type, "_uploads.db")
@@ -40,7 +43,7 @@ tab1aServer <- function(input, output, session,
       )
     }
 
-    # Scenario template download handler
+
     # Scenario template download handler
     output$download_scenario_template <- downloadHandler(
       filename = function() {
@@ -477,7 +480,7 @@ tab1aServer <- function(input, output, session,
         updateTextInput(session, session$ns("scenario_name"), value = "")
         updateTextAreaInput(session, session$ns("scenario_description"), value = "")
 
-        refresh_trigger(refresh_trigger() + 1)
+        shared$refresh_trigger <- shared$refresh_trigger + 1
 
         removeModal()
         showModal(modalDialog(
@@ -606,7 +609,7 @@ tab1aServer <- function(input, output, session,
       updateTextInput(session, session$ns("cost_name"), value = "")
       updateTextAreaInput(session, session$ns("cost_description"), value = "")
 
-      refresh_trigger(refresh_trigger() + 1)
+      shared$refresh_trigger <- shared$refresh_trigger + 1
 
       removeModal()
       showModal(modalDialog(
@@ -783,7 +786,7 @@ observeEvent(input$delete_scenario, {
     ))
 
     # Trigger UI refresh
-    refresh_trigger(refresh_trigger() + 1)
+    shared$refresh_trigger <- shared$refresh_trigger + 1
   } else {
     showModal(modalDialog(
       title = "Error",
@@ -818,7 +821,7 @@ observeEvent(input$delete_cost, {
       easyClose = TRUE
     ))
 
-    refresh_trigger(refresh_trigger() + 1)
+    shared$refresh_trigger <- shared$refresh_trigger + 1
   } else {
     showModal(modalDialog(
       title = "Error",
@@ -829,5 +832,70 @@ observeEvent(input$delete_cost, {
 
   dbDisconnect(db)
 })
+
+# Adding instructions pop up
+observeEvent(input$show_instructions, {
+  showModal(modalDialog(
+    title = "Detailed Instructions for Uploading Templates",
+    easyClose = TRUE,
+    size = "l",
+    footer = modalButton("Close"),
+    tagList(
+      tags$b("Steps to Use – No previous data uploaded:"),
+      p("Follow these steps if you have yet used the tool – see the number referenced screen shot to reference between steps."),
+      tags$ol(
+        tags$li("📆️ Select planning years to define the scope of your scenario"),
+        tags$li("📄 Click 'Download Empty Scenario Template'"),
+        tags$li("📊 Fill out the Excel template: each sheet corresponds to a year, and each row represents the smallest spatial unit used for intervention planning. Each column details a specific type of malaria intervention preceded by the word ‘code_’ Enter 1 for planned interventions and 0 otherwise. In the corresponding ‘type_’ column for each intervention select the type of intervention that is planned for. For example, in the ‘type_vaccine’ column select from “R21” or “RTSS”. If the intervention type is not included in the drop down list you can overwrite with free text to include this."),
+        tags$li("💾 Once a plan has been specified by indicating what interventions are to be targeted where each year the user can save a local copy of this file."),
+        tags$li("📤 Return to the web application and upload the completed Excel file using the form, and give the scenario a short name: e.g. Plan A/ Plan 1 etc and a description: e.g. “Fully scaled up plan”/ “Restricted vaccine roll out plan” – make sure these are informative descriptions as it will be helpful when comparing plans."),
+        tags$li("📂 Press “Submit Scenario” button and the spreadsheet will be uploaded in to the tool."),
+        tags$li("📋 Uploaded plans will appear in a summary table with details like plan name, years covered, and upload date."),
+        tags$li("💵 Now we also need to specify the unit costs that will be critical for the tool to generate our budgets."),
+        tags$li("📄 Click 'Download Empty Cost Template'"),
+        tags$li("📊 Fill out the Excel template: The Unit Cost template allows for the user to have flexibility in specifying the exact unit costs relevant to the country context the template has the following columns:"),
+        tags$ul(
+          tags$li("resource_name: Long name description of unit cost data e.g. “Procurement cost of malaria vaccine per dose”"),
+          tags$li("code_intervention: Select from the drop down list the type of intervention the unit cost related to e.g. vaccine/ itn_campaign/ smc"),
+          tags$li("type_intervention: Select from the drop down list the specific type of intervention unit cost relates to e.g. r21/ rtss/ pyrethroid_net/ PBO net"),
+          tags$li("cost_class: Select from the drop down list the class of cost: e,g Procurement/ Distribution/ Operational/ Supportive"),
+          tags$li("unit: specify the exact unit e.g. per dose, per ITN, per child etc"),
+          tags$li("local_currency_cost: Specific cost in local currency"),
+          tags$li("usd_cost: Specific cost in USD"),
+          tags$li("cost_year: Year that cost relates to"),
+          tags$li("source: Reference the cost source used to generate unit cost data")
+        ),
+        tags$li("Ensure that for each intervention being delivered there are unit costs for the specific intervention and intervention type."),
+        tags$li("💾 Once unit cost data has been specified, the user can save a local copy of this file."),
+        tags$li("📤 Return to the web application and upload the completed Excel file using the form and give the cost sheet a name: e.g. “Cost Assumptions 1” etc and a description: e.g. “Including a higher cost estimate of procurement for PBO nets” – make sure these are informative descriptions as it will be helpful when generating and comparing plans."),
+        tags$li("📂 Press “Submit Cost Sheet” button and the spreadsheet will be uploaded in to the tool."),
+        tags$li("📋 Uploaded cost data will appear in a summary table with details like cost name, description, and upload date.")
+      ),
+      tags$br(),
+      tags$b("Steps to Use – Previous data uploaded:"),
+      p("Once a spreadsheet has been uploaded into the tool the user is capable downloading a template based on a specific scenario uploaded – this can make it easier to quickly populate a new scenario without having to replicate every item but make sure to input a new scenario name and description when re-uploading."),
+      p("Once both sets of data have been uploaded the user can move on to the next stage of the application.")
+    )
+  ))
+})
+
+# # returning the data as a reactive list for future data processing
+# return(
+#   list(
+#     uploaded_scenarios = reactive({
+#       db <- DBI::dbConnect(RSQLite::SQLite(), "scenario_uploads.db")
+#       df <- dbReadTable(db, "uploads")
+#       dbDisconnect(db)
+#       df
+#     }),
+#     uploaded_costs = reactive({
+#       db <- DBI::dbConnect(RSQLite::SQLite(), "cost_uploads.db")
+#       df <- dbReadTable(db, "uploads")
+#       dbDisconnect(db)
+#       df
+#     })
+#
+#   )
+# )
 
 }

@@ -1,14 +1,54 @@
-tab2Server <- function(input, output, session, static_mix_maps) {
+tab2Server <- function(input, output, session, shared) {
   ns <- session$ns
 
-  # Check if static_mix_maps exists and contains data
-  data_available <- reactive({
-    exists("static_mix_maps", inherits = FALSE) &&
-      !is.null(static_mix_maps) &&
-      nrow(static_mix_maps) > 0
+  # Track data load state using a cache
+  scenario_uploads_cache <- reactiveVal(NULL)
+
+  # Trigger to refresh when shared refresh_trigger changes
+  observeEvent(shared$refresh_trigger, {
+    message("🔄 Refreshing scenario_uploads from uploaded scenario files...")
+    scenario_uploads_cache(load_all_uploaded_scenarios())
+  }, ignoreInit = FALSE)
+
+  # Function to read in the uploaded scenarios from the database
+  load_all_uploaded_scenarios <- function(db_path = "scenario_uploads.db", folder = "uploads/scenarios") {
+    db <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+    uploads <- DBI::dbGetQuery(db, "SELECT name, description, filename, years FROM uploads")
+    DBI::dbDisconnect(db)
+
+    if (nrow(uploads) == 0) return(NULL)
+
+    combined_data <- purrr::map_dfr(seq_len(nrow(uploads)), function(i) {
+      row <- uploads[i, ]
+      file_path <- file.path(folder, row$filename)
+
+      if (!file.exists(file_path)) return(NULL)
+
+      year_sheets <- unlist(strsplit(row$years, ","))
+      purrr::map_dfr(year_sheets, function(y) {
+        df <- tryCatch(readxl::read_excel(file_path, sheet = y), error = function(e) NULL)
+        if (is.null(df)) return(NULL)
+
+        df$year <- as.integer(y)
+        df$scenario_name <- row$name
+        df$scenario_description <- row$description
+        df
+      })
+    })
+
+    return(combined_data)
+  }
+
+  # Use cached value for downstream processing
+  scenario_uploads <- reactive({
+    scenario_uploads_cache()
   })
 
-  # Show message if no data is available
+  data_available <- reactive({
+    df <- scenario_uploads()
+    !is.null(df) && nrow(df) > 0
+  })
+
   observe({
     if (!data_available()) {
       output$intervention_tabs <- renderUI({
@@ -23,11 +63,68 @@ tab2Server <- function(input, output, session, static_mix_maps) {
     }
   })
 
+  observe({
+    req(scenario_uploads())
+    print("Scenarios loaded:")
+    print(head(scenario_uploads()))
+  })
+
+  # input selection values
+  output$plan_select_ui <- renderUI({
+    req(scenario_uploads())
+
+    plans <- unique(scenario_uploads()$scenario_name)
+    selectInput(
+      ns("plan_select"),
+      "Select the Plan:",
+      choices = c("", sort(plans)),
+      selected = ""
+    )
+  })
+
+  output$year_select_ui <- renderUI({
+    req(scenario_uploads())
+
+    years <- unique(scenario_uploads()$year)
+    selectInput(
+      ns("year_select"),
+      "Select Years of Interest:",
+      choices = c("", sort(years), "All Years"),
+      selected = ""
+    )
+  })
+
+  # Instructions
+  # Adding instructions pop up
+  observeEvent(input$show_instructions, {
+    showModal(modalDialog(
+      title = "Detailed Instructions for using the check-point",
+      easyClose = TRUE,
+      size = "l",
+      footer = modalButton("Close"),
+      tagList(
+        p("Once a plan has been uploaded the user can move onto the ‘Check Scenario’ tab. This section allows users to validate their uploaded intervention plans and flag any inconsistencies or logic errors. It provides a quick visual and tabular summary of intervention coverage by state and year."),
+        p("The section will also flag or potential delivery errors using warning alerts"),
+        tags$b("Steps to Use:"),
+        tags$ol(
+          tags$li("📂 Select a previously uploaded plan from the dropdown menu."),
+          tags$li("📅 Select the year of interest from the dropdown list. The data will update accordingly."),
+          tags$li("💉 Click on an intervention tab (e.g., SMC, Vaccine, IRS, etc.) to view targeting information."),
+          tags$li("📊 View headline coverage statistics shown as colored summary boxes: ✅ Full Coverage, 🟧 Partial Coverage, ❌ No Coverage."),
+          tags$li("📋 Review the interactive table below to see detailed counts by state."),
+          tags$li("🔍 Use the search bar to quickly find specific states or values."),
+          tags$li("⚠️ If an intervention targeting error is spotted by the tool this will be flagged to the user. Example: <screen shot>")
+        ),
+        p("📝 Tip: Use this section to verify the accuracy of your uploaded scenario before generating budgets.")
+      )
+    ))
+  })
+
   # Get unique interventions from data
   interventions <- reactive({
     req(data_available(), input$plan_select)
-    static_mix_maps %>%
-      filter(plan_shortname == input$plan_select) %>%
+    scenario_uploads() %>%
+      filter(scenario_name == input$plan_select) %>%
       pull(intervention) %>%
       unique() %>%
       sort()
@@ -55,14 +152,14 @@ tab2Server <- function(input, output, session, static_mix_maps) {
     req(data_available(), input$plan_select)
 
     year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-      unique(static_mix_maps$year)
+      unique(scenario_uploads$year)
     } else {
       input$year_select
     }
 
-    static_mix_maps %>%
+    scenario_uploads() %>%
       filter(
-        plan_shortname == input$plan_select,
+        scenario_name == input$plan_select,
         year %in% year_filter
       )
   })
@@ -72,15 +169,15 @@ tab2Server <- function(input, output, session, static_mix_maps) {
     req(data_available(), input$plan_select)
 
     year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-      unique(static_mix_maps$year)
+      unique(scenario_uploads$year)
     } else {
       input$year_select
     }
 
     # Which LGAs are receiving PMC each year
-    pmc_tmp <- static_mix_maps %>%
+    pmc_tmp <- scenario_uploads() %>%
       st_drop_geometry() %>%
-      filter(plan_shortname == input$plan_select,
+      filter(scenario_name == input$plan_select,
              intervention == "PMC")
 
     # Apply year filter if provided
@@ -93,9 +190,9 @@ tab2Server <- function(input, output, session, static_mix_maps) {
       distinct(year, state, lga, intervention)
 
     # Which LGAs are receiving SMC each year
-    smc_tmp <- static_mix_maps %>%
+    smc_tmp <- scenario_uploads() %>%
       st_drop_geometry() %>%
-      filter(plan_shortname == input$plan_select,
+      filter(scenario_name == input$plan_select,
              intervention == "SMC")
 
     # Apply year filter if provided
@@ -172,7 +269,7 @@ tab2Server <- function(input, output, session, static_mix_maps) {
 
     # Get year filter once for all interventions
     year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-      unique(static_mix_maps$year)
+      unique(scenario_uploads$year)
     } else {
       input$year_select
     }
@@ -266,7 +363,7 @@ tab2Server <- function(input, output, session, static_mix_maps) {
 
           # Get year filter
           year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-            unique(static_mix_maps$year)
+            unique(scenario_uploads$year)
           } else {
             input$year_select
           }

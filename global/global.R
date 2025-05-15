@@ -166,7 +166,7 @@ scenario_data <- map_dfr(scenario_files, read_sheets_with_year)
 
 # create empty elements that will get filled by the tool
 intervention_mix_maps <- NULL
-static_mix_maps <- NULL
+# static_mix_maps <- NULL
 
 # Shape files
 country_outline <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/country_shapefile.shp")

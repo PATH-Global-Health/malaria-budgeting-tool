@@ -85,7 +85,7 @@ tab0UI <- function(id) {
             tags$li("🔍 Use the search bar to quickly find specific states or values."),
             tags$li("⚠️ If an intervention targeting error is spotted by the tool this will be flagged to the user. Example: <screen shot>")
           ),
-          p("📝 Tip: Use this section to verify the accuracy of your uploaded scenario before proceeding to plan visualization or comparisons.")
+          p("📝 Tip: Use this section to verify the accuracy of your uploaded scenario before generating budgets.")
         )
       ),
 

@@ -111,7 +111,13 @@ ui <- page_fluid(
 #-Define Server-----------------------------------------------------------------
 server <- function(input, output, session) {
 
-   #-Dynamically render content for each tab------------
+  #-Shared reactive values for uploads and refresh-----
+  shared <- reactiveValues(
+    refresh_trigger = 0
+  )
+
+
+  #-Dynamically render content for each tab------------
   output$page_content <- renderUI({
     switch(input$sidebar_menu,
            "tab0" = tab0UI("tab0"),
@@ -127,8 +133,9 @@ server <- function(input, output, session) {
 
   #=Call modules for each tab------------------------
   callModule(tab0Server, id = "tab0")
-  callModule(tab1aServer, id = "tab1a", template_file_path, SCENARIO_COLS, COST_COLS, TEMPLATE_ADMIN_DATA)
-  callModule(tab2Server, id = "tab2", static_mix_maps)
+  callModule(tab1aServer, id = "tab1a", template_file_path, SCENARIO_COLS,
+             COST_COLS, TEMPLATE_ADMIN_DATA, shared = shared)
+  callModule(tab2Server, id = "tab2", shared = shared)
   callModule(tab2aServer, id = "tab2a")
   callModule(tab3Server, "tab3", lga_outline, state_outline, country_outline, intervention_mix_maps, static_mix_maps)
   callModule(tab4Server, id = "tab4", lga_outline, state_outline, country_outline, intervention_mix_maps)

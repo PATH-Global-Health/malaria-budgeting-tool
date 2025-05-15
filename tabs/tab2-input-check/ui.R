@@ -2,8 +2,10 @@ tab2UI <- function(id) {
   ns <- NS(id)
 
   fluidPage(
-    titlePanel("Intervention Coverage by LGA"),
-    h3("Plan and Intervention Analysis"),
+    titlePanel("Intervention Targeting Check Point"),
+
+    # Instructions pop up
+    actionButton(ns("show_instructions"), "📘 Detailed Instructions", class = "btn-info"),
 
     # User input selections grouped into a card
     card(
@@ -14,28 +16,11 @@ tab2UI <- function(id) {
         layout_column_wrap(
           width = 1/3, # Wrap items into three columns
 
-          # Plan Selection
-          div(
-            style = "position: relative; z-index: 1002;", # Higher z-index
-            selectInput(
-              ns("plan_select"),
-              "Select the Plan:",
-              choices = c("", unique_plans2),
-              selected = "",
-              multiple = FALSE
-            )
-          ),
+          # Dynamic Plan Selection
+          uiOutput(ns("plan_select_ui")),
 
-          # Year Selection
-          div(
-            style = "position: relative; z-index: 1001;", # High z-index
-            selectInput(
-              ns("year_select"),
-              "Select Years of Interest:",
-              choices = c("", years_to_select, "All Years"),
-              selected = ""
-            )
-          ),
+          # Dynamic Year Selection
+          uiOutput(ns("year_select_ui")),
 
           # Clear button
           div(

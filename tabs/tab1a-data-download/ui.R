@@ -5,19 +5,25 @@ tab1aUI <- function(id) {
     # Add the useShinyjs() function
     useShinyjs(),
     tags$head(
-      # Add the resetScroll() function - helps with scrolling after upload
+      # Keep your scroll-to-top function
       tags$script("
-        function resetScroll() {
-          window.scrollTo(0, 0);
-        }
-      ")
+    function resetScroll() {
+      window.scrollTo(0, 0);
+    }
+  "),
+
+      # Add this script to fix scroll freezing after modals
+      tags$script(HTML("
+    $(document).on('hidden.bs.modal', function () {
+      $('body').removeClass('modal-open');
+      $('body').css('overflow', 'auto');
+    });
+  "))
     ),
 
     titlePanel("Data Download and Upload"),
-    # h3("Content for Tab 1a goes here"),
     page_sidebar(
-      # title = "Malaria Control Program Planning Tool",
-      sidebar = sidebar(
+        sidebar = sidebar(
         width = "400px",
         card(
           "Instructions",
@@ -32,6 +38,8 @@ tab1aUI <- function(id) {
             tags$li("Download an existing file from the tables below")
           )
         ),
+
+        actionButton(ns("show_instructions"), "📘 Detailed Instructions", class = "btn-info"),
 
         # Scenario Template Section
         card(
