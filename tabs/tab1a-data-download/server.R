@@ -665,8 +665,8 @@ tab1aServer <- function(input, output, session,
         callback = JS("
         table.on('click', '.delete-btn', function() {
           var id = $(this).data('id');
-          if (confirm('Are you sure you want to permanently delete this scenario? This action cannot be undone.')) {
-            Shiny.setInputValue('delete_scenario', id, {priority: 'event'});
+          if (confirm('Are you sure you want to permanently delete this scenario?')) {
+            Shiny.setInputValue('tab1a-delete_scenario', id, {priority: 'event'});
           }
         });
       ")
@@ -693,47 +693,141 @@ tab1aServer <- function(input, output, session,
   })
 
 
+  # Render table for cost uploads
+  output$cost_uploads_table <- renderDT({
+    refresh_trigger()
 
-output$cost_uploads_table <- renderDT({
-  refresh_trigger()
-
-  db <- dbConnect(SQLite(), "cost_uploads.db")
-  uploads <- dbGetQuery(db, "
+    db <- dbConnect(SQLite(), "cost_uploads.db")
+    uploads <- dbGetQuery(db, "
     SELECT id, name, description, filename, upload_date
     FROM uploads
     ORDER BY upload_date DESC
   ")
-  dbDisconnect(db)
+    dbDisconnect(db)
 
-  if (nrow(uploads) > 0) {
-    datatable(
-      uploads[, c("name", "description", "upload_date")],
-      options = list(
-        pageLength = 5,
-        scrollY = "200px",
-        scrollCollapse = TRUE
-      ),
-      colnames = c("Name", "Description", "Upload Date"),
-      selection = "none"
-    ) %>%
-      formatDate("upload_date")
-  } else {
-    datatable(
-      data.frame(
-        Name = character(),
-        Description = character(),
-        "Upload Date" = character()
-      ),
-      options = list(
-        pageLength = 5,
-        scrollY = "200px",
-        scrollCollapse = TRUE
-      ),
-      selection = "none"
-    )
-  }
-})
+    if (nrow(uploads) > 0) {
+      # Add delete button
+      uploads$actions <- paste0(
+        '<button class="btn btn-danger btn-sm delete-cost-btn" data-id="', uploads$id, '">Delete</button>'
+      )
+
+      datatable(
+        uploads[, c("name", "description", "upload_date", "actions")],
+        options = list(
+          pageLength = 5,
+          scrollY = "200px",
+          scrollCollapse = TRUE,
+          columnDefs = list(
+            list(targets = 3, orderable = FALSE)  # 'Actions' column not sortable
+          )
+        ),
+        colnames = c("Name", "Description", "Upload Date", "Actions"),
+        selection = "none",
+        escape = FALSE,
+        callback = JS("
+        table.on('click', '.delete-cost-btn', function() {
+          var id = $(this).data('id');
+          if (confirm('Are you sure you want to permanently delete this cost file? This action cannot be undone.')) {
+            Shiny.setInputValue('tab1a-delete_cost', id, {priority: 'event'});
+          }
+        });
+      ")
+      ) %>%
+        formatDate("upload_date")
+    } else {
+      datatable(
+        data.frame(
+          Name = character(),
+          Description = character(),
+          "Upload Date" = character(),
+          Actions = character()
+        ),
+        options = list(
+          pageLength = 5,
+          scrollY = "200px",
+          scrollCollapse = TRUE
+        ),
+        selection = "none",
+        escape = FALSE
+      )
+    }
+  })
 
 # Observe event delete data
+observeEvent(input$delete_scenario, {
+  req(input$delete_scenario)
+
+  print(paste("Triggered delete for scenario ID:", input$delete_scenario))
+
+  scenario_id <- input$delete_scenario
+
+  # Connect to DB and get the filename
+  db <- dbConnect(SQLite(), "scenario_uploads.db")
+  file_info <- dbGetQuery(db, "SELECT filename FROM uploads WHERE id = ?", list(scenario_id))
+
+  if (nrow(file_info) > 0) {
+    file_path <- file.path("uploads/scenarios", file_info$filename[1])
+
+    # Delete the actual file
+    if (file.exists(file_path)) {
+      file.remove(file_path)
+    }
+
+    # Remove from the DB
+    dbExecute(db, "DELETE FROM uploads WHERE id = ?", list(scenario_id))
+
+    showModal(modalDialog(
+      title = "Deleted",
+      "The selected scenario has been deleted.",
+      easyClose = TRUE
+    ))
+
+    # Trigger UI refresh
+    refresh_trigger(refresh_trigger() + 1)
+  } else {
+    showModal(modalDialog(
+      title = "Error",
+      "Scenario not found or already deleted.",
+      easyClose = TRUE
+    ))
+  }
+
+  dbDisconnect(db)
+})
+
+# Delete Cost action
+observeEvent(input$delete_cost, {
+  req(input$delete_cost)
+  cost_id <- input$delete_cost
+
+  db <- dbConnect(SQLite(), "cost_uploads.db")
+  file_info <- dbGetQuery(db, "SELECT filename FROM uploads WHERE id = ?", list(cost_id))
+
+  if (nrow(file_info) == 1) {
+    file_path <- file.path("uploads/costs", file_info$filename)
+
+    if (file.exists(file_path)) {
+      file.remove(file_path)
+    }
+
+    dbExecute(db, "DELETE FROM uploads WHERE id = ?", list(cost_id))
+
+    showModal(modalDialog(
+      title = "Deleted",
+      "The selected cost file has been permanently deleted.",
+      easyClose = TRUE
+    ))
+
+    refresh_trigger(refresh_trigger() + 1)
+  } else {
+    showModal(modalDialog(
+      title = "Error",
+      "Cost file not found or already deleted.",
+      easyClose = TRUE
+    ))
+  }
+
+  dbDisconnect(db)
+})
 
 }

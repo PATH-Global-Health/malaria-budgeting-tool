@@ -955,21 +955,22 @@ format_cost_label <- function(value, currency_select, is_per_person = FALSE) {
 
 #-Budget comparison plot-------------------------------------------------------------------------
 # Cost Comparison Plot
-budget_barchart <- function(data, currency_select){
-
+budget_barchart <- function(data, currency_select) {
 
   currency_symbol <- if (currency_select == "USD") "$" else "₦"
 
-  data <-
-    data  |>
+  data <- data |>
     mutate(
       budget_millions = round(total_budget / 1e6),
       hover_text = paste0("Plan: ", plan_shortname, "<br>",
                           "Total Cost: ", currency_symbol, format(budget_millions, big.mark = ","), "M")
     )
 
-  p <-
-    ggplot(data, aes(x = plan_shortname, y = budget_millions, fill = plan_shortname, text = hover_text)) +
+  # Generate palette safely
+  palette_fun <- ggthemes::canva_pal("Fun and tropical")
+  colors <- palette_fun(length(unique(data$plan_shortname)))
+
+  p <- ggplot(data, aes(x = plan_shortname, y = budget_millions, fill = plan_shortname, text = hover_text)) +
     geom_bar(stat = "identity", width = 0.6) +
     geom_text(aes(label = paste0(currency_symbol, format(budget_millions, big.mark = ","), "M")),
               vjust = -0.5, size = 4) +
@@ -978,12 +979,10 @@ budget_barchart <- function(data, currency_select){
     theme(text = element_text(size = 12)) +
     scale_y_continuous(labels = scales::comma) +
     guides(fill = "none") +
-    scale_fill_manual(values = ggthemes::canva_pal("Fun and tropical")(length(unique(data$plan_shortname))))
-
+    scale_fill_manual(values = colors)
 
   ggplotly(p, tooltip = "text") %>%
     layout(hoverlabel = list(bgcolor = "white"))
-
 }
 
 # cost difference plot-----------------------------------------------------------------------
@@ -1096,13 +1095,13 @@ count_lga_coverage <- function(intervention, plan, year_filter = NULL) {
     st_drop_geometry() |>
     filter(intervention == !!intervention,
            plan_shortname == !!plan)
-  
+
   # Apply year filter if provided
   if (!is.null(year_filter)) {
     receiving <- receiving |>
       filter(year %in% year_filter)
   }
-  
+
   receiving <- receiving |>
     distinct(year, state, lga)
 
@@ -1110,13 +1109,13 @@ count_lga_coverage <- function(intervention, plan, year_filter = NULL) {
   total_lgas <- static_mix_maps |>
     filter(plan_shortname == !!plan) |>
     st_drop_geometry()
-  
+
   # Apply year filter if provided
   if (!is.null(year_filter)) {
     total_lgas <- total_lgas |>
       filter(year %in% year_filter)
   }
-  
+
   total_lgas <- total_lgas |>
     distinct(year, state, lga)
 
@@ -1141,7 +1140,7 @@ count_lga_coverage <- function(intervention, plan, year_filter = NULL) {
            Covered = receiving,
            Uncovered = not,
            `Coverage %` = coverage_pct) |>
-    arrange(Year, State) |> 
+    arrange(Year, State) |>
     ungroup()
 }
 
@@ -1150,14 +1149,14 @@ smc_pmc_check <- function(plan, year_filter = NULL) {
   pmc_tmp <- static_mix_maps |>
     st_drop_geometry() |>
     filter(plan_shortname == !!plan,
-           intervention == "PMC") 
-    
+           intervention == "PMC")
+
   # Apply year filter if provided
   if (!is.null(year_filter) && length(year_filter) > 0 && !all(is.na(year_filter))) {
     pmc_tmp <- pmc_tmp |>
       filter(year %in% year_filter)
   }
-  
+
   pmc_tmp <- pmc_tmp |>
     distinct(year, state, lga, intervention)
 
@@ -1166,20 +1165,20 @@ smc_pmc_check <- function(plan, year_filter = NULL) {
     st_drop_geometry() |>
     filter(plan_shortname == !!plan,
            intervention == "SMC")
-    
+
   # Apply year filter if provided
   if (!is.null(year_filter) && length(year_filter) > 0 && !all(is.na(year_filter))) {
     smc_tmp <- smc_tmp |>
       filter(year %in% year_filter)
   }
-  
+
   smc_tmp <- smc_tmp |>
     distinct(year, state, lga, intervention)
 
   # Complete join by year, state, and lga
-  smc_pmc <- inner_join(pmc_tmp, smc_tmp, by = c("year", "state", "lga")) |> 
+  smc_pmc <- inner_join(pmc_tmp, smc_tmp, by = c("year", "state", "lga")) |>
     select(year, state, lga)
-    
+
   # If none return message within "None.", otherwise return all SMC and PMC data
   if (nrow(smc_pmc) == 0) {
     NULL
