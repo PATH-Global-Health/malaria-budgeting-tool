@@ -130,6 +130,7 @@ tab2Server <- function(input, output, session, shared) {
       sort()
   })
 
+
   # Track the currently active intervention tab
   active_intervention <- reactiveVal()
 
