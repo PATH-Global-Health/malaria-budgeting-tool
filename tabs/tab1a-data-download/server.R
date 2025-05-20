@@ -1,6 +1,10 @@
 tab1aServer <- function(input, output, session,
   template_file_path, SCENARIO_COLS, COST_COLS, TEMPLATE_ADMIN_DATA, shared) {
 
+  # Add unified shared caches for scenario and cost uploads
+  shared$scenario_uploads_cache <- reactiveVal(NULL)
+  shared$cost_upload_cache <- reactiveVal(NULL)
+
     # Template file path check
     observe({
       if (!file.exists(template_file_path)) {
@@ -41,6 +45,32 @@ tab1aServer <- function(input, output, session,
         is_duplicate = nrow(result) > 0,
         existing_name = if (nrow(result) > 0) result$name[1] else NULL
       )
+    }
+
+    # Load all uploaded scenario metadata (from DB)
+    load_all_uploaded_scenarios <- function() {
+      db <- DBI::dbConnect(RSQLite::SQLite(), "scenario_uploads.db")
+      uploads <- DBI::dbGetQuery(db, "SELECT * FROM uploads ORDER BY upload_date DESC")
+      DBI::dbDisconnect(db)
+      uploads
+    }
+
+    # Load the latest uploaded cost Excel file as a dataframe
+    load_latest_uploaded_cost <- function() {
+      db <- DBI::dbConnect(RSQLite::SQLite(), "cost_uploads.db")
+      uploads <- DBI::dbGetQuery(db, "SELECT * FROM uploads ORDER BY upload_date DESC LIMIT 1")
+      DBI::dbDisconnect(db)
+
+      if (nrow(uploads) > 0) {
+        file_path <- file.path("uploads/costs", uploads$filename[1])
+        if (file.exists(file_path)) {
+          readxl::read_excel(file_path)
+        } else {
+          NULL
+        }
+      } else {
+        NULL
+      }
     }
 
 
@@ -482,6 +512,8 @@ tab1aServer <- function(input, output, session,
 
         shared$refresh_trigger <- shared$refresh_trigger + 1
 
+        shared$scenario_uploads_cache(load_all_uploaded_scenarios())
+
         removeModal()
         showModal(modalDialog(
           title = "Success",
@@ -610,6 +642,7 @@ tab1aServer <- function(input, output, session,
       updateTextAreaInput(session, session$ns("cost_description"), value = "")
 
       shared$refresh_trigger <- shared$refresh_trigger + 1
+      shared$cost_upload_cache(load_all_uploaded_cost())
 
       removeModal()
       showModal(modalDialog(

@@ -43,6 +43,8 @@ tab2UI <- function(id) {
     uiOutput(ns("coverage_summary")),
 
     # Output card with tabs for each intervention
-    uiOutput(ns("intervention_tabs"))
+    shinycssloaders::withSpinner(uiOutput(ns("intervention_tabs")), type = 1)
   )
 }
+
+

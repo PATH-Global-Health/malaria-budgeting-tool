@@ -14,13 +14,11 @@ tab3UI <- function(id) {
         layout_column_wrap(
           width = 1/4, # Wrap items into four columns
 
-          # Plan Selection
-          selectInput(
-            ns("plan_select"),
-            "Select the Plan:",
-            choices = c("", unique_plans),
-            selected = ""
-          ),
+          actionButton(ns("reload_budget_data"), "Reload Budget Data",
+                       icon = icon("sync"), class = "btn-info"),
+
+          # Plan Selection - now using uiOutput for dynamic choices
+          uiOutput(ns("plan_select_ui")),
 
           # Spatial Scale Selection
           selectInput(
@@ -36,13 +34,8 @@ tab3UI <- function(id) {
           # Conditional UI for LGA Selection
           uiOutput(ns("lga_ui")),
 
-          # Year Selection
-          selectInput(
-            ns("year_select"),
-            "Select Years of Interest:",
-            choices = c("", years_to_select, "All Years"),
-            selected = ""
-          ),
+          # Year Selection - now using uiOutput for dynamic choices
+          uiOutput(ns("year_select_ui")),
 
           # Currency Selection
           selectInput(
@@ -79,6 +72,5 @@ tab3UI <- function(id) {
 
     # Additional Charts
     uiOutput(ns("cost_charts"))
-
   )
 }

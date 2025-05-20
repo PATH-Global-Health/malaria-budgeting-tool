@@ -111,11 +111,28 @@ ui <- page_fluid(
 #-Define Server-----------------------------------------------------------------
 server <- function(input, output, session) {
 
-  #-Shared reactive values for uploads and refresh-----
+
+#-Shared reactive values for uploads and refresh-----
   shared <- reactiveValues(
-    refresh_trigger = 0
+    refresh_trigger = 0,
+    budget_results = NULL,
+    budget_results_available = FALSE
   )
 
+  # Initialize shared upload caches and reloaders
+  initSharedDataManager(shared)
+
+  # Create an observer to load data initially
+  observe({
+    # This runs once when the app starts
+    shared$reload_scenarios()
+    shared$reload_costs()
+
+    # If you have the budget reload function
+    if (exists("reload_budgets", shared)) {
+      shared$reload_budgets()
+    }
+  }, priority = 1000)
 
   #-Dynamically render content for each tab------------
   output$page_content <- renderUI({
@@ -136,9 +153,10 @@ server <- function(input, output, session) {
   callModule(tab1aServer, id = "tab1a", template_file_path, SCENARIO_COLS,
              COST_COLS, TEMPLATE_ADMIN_DATA, shared = shared)
   callModule(tab2Server, id = "tab2", shared = shared)
-  callModule(tab2aServer, id = "tab2a")
-  callModule(tab3Server, "tab3", lga_outline, state_outline, country_outline, intervention_mix_maps, static_mix_maps)
-  callModule(tab4Server, id = "tab4", lga_outline, state_outline, country_outline, intervention_mix_maps)
+  callModule(tab2aServer, id = "tab2a", shared = shared)
+  callModule(tab3Server, "tab3", lga_outline, state_outline, country_outline,
+               shared)
+  callModule(tab4Server, id = "tab4", lga_outline, state_outline, country_outline, shared)
   callModule(tab5Server, id = "tab5")
   callModule(tab6Server, id = "tab6")
 }

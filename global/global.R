@@ -27,6 +27,7 @@ library(writexl)
 library(webshot2)
 library(htmlwidgets)
 library(purrr)
+library(shinycssloaders)
 # library(openxlsx2)
 
 #-read in usable data-----------------------------------------------------------
@@ -152,11 +153,11 @@ read_sheets_with_year <- function(file_path) {
 # Read and combine all files/sheets
 scenario_data <- map_dfr(scenario_files, read_sheets_with_year)
 
-
-
-
-
-
+target_population <-
+  readxl::read_xlsx(
+    "data/nga-demo-data-pre-processed/data-needs-not-user-defined.xlsx",
+    sheet = "population"
+  )
 
 
 

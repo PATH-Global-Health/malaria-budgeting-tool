@@ -1,42 +1,162 @@
-tab4Server <-
-  function(input, output,
-           session, lga_outline,
-           state_outline, country_outline, intervention_mix_maps) {
+tab4Server <- function(input, output, session,
+                       lga_outline, state_outline, country_outline,
+                       shared) {
+  ns <- session$ns
 
-  #-check if data avaliable and add message if not-----------------------------------------------
-   data_ready <- reactive({
-      !is.null(intervention_mix_maps) && nrow(intervention_mix_maps) > 0
-    })
+  # Track data availability for this tab
+  local_data_available <- reactiveVal(FALSE)
 
-   observe({
-      if (!data_ready()) {
-        output$page_description <- renderUI({
-          card(
-            card_header("Budgets Not Yet Generated"),
-            card_body(
-              tags$p("Budgets not yet generated - return to the 'Generate Budgets' tab to specificy budget generation"),
-              tags$p("Once generated, return to this tab to view the generated budgets")
-            )
-          )
-        })
-      }
-    })
+  observe({
+    if (!is.null(shared$budget_results) &&
+        is.data.frame(shared$budget_results) &&
+        nrow(shared$budget_results) > 0) {
+      local_data_available(TRUE)
+    } else {
+      local_data_available(FALSE)
+    }
+  })
 
-  #-UI selection for remaining plans---------------------------------------------------------
-  output$remaining_plan_select <- renderUI({
-    # Make sure a baseline plan is selected
+  data_ready <- reactive({
+    local_data_available()
+  })
+
+  # Extract available plans and years from shared data
+  available_plans <- reactive({
+    req(shared$budget_results)
+    shared$budget_results %>%
+      select(source_scenario, source_cost) %>%
+      distinct() %>%
+      mutate(plan_label = paste0(source_scenario, " with ", source_cost))
+  })
+
+  available_years <- reactive({
+    req(shared$budget_results)
+    sort(unique(shared$budget_results$year))
+  })
+
+  # Parse plan inputs
+  parse_plan <- function(x) strsplit(x, "\\|\\|\\|")[[1]]
+
+  baseline_shortname <- reactive({
     req(input$plan_bl_select)
+    parse_plan(input$plan_bl_select)[1]
+  })
 
-    # Compute the remaining plans
-    available_plans <- setdiff(plan_labels, input$plan_bl_select)
+  baseline_costname <- reactive({
+    req(input$plan_bl_select)
+    parse_plan(input$plan_bl_select)[2]
+  })
 
-    # Return a checkbox group input using the available plans
+  comparison_details <- reactive({
+    req(input$remaining_plan_select)
+    lapply(input$remaining_plan_select, parse_plan)
+  })
+
+  comparison_labels <- reactive({
+    req(comparison_details())
+    purrr::map_chr(comparison_details(), ~ paste(.x[1], "with", .x[2]))
+  })
+
+  # UI for plan selection
+  output$plan_bl_select_ui <- renderUI({
+    plans <- available_plans()
+    choices <- c("", setNames(
+      paste0(plans$source_scenario, "|||", plans$source_cost),
+      plans$plan_label
+    ))
+    selectInput(ns("plan_bl_select"), "Select the Baseline Plan:", choices = choices, selected = "")
+  })
+
+  output$remaining_plan_select <- renderUI({
+    req(input$plan_bl_select)
+    plans <- available_plans()
+    all_choices <- paste0(plans$source_scenario, "|||", plans$source_cost)
+    bl <- input$plan_bl_select
+    remaining <- setdiff(all_choices, bl)
+    display_labels <- plans$plan_label[match(remaining, all_choices)]
     checkboxGroupInput(
-      session$ns("remaining_plan_select"),
+      ns("remaining_plan_select"),
       "Select plans to compare:",
-      choices = available_plans,
-      inline = FALSE
+      choices = setNames(remaining, display_labels)
     )
+  })
+
+  # UI for year selection
+  output$year_select_ui <- renderUI({
+    years <- available_years()
+    if (length(years) > 1) {
+      choices <- c("", as.character(years), "All Years")
+    } else {
+      choices <- c("", as.character(years))
+    }
+    selectInput(
+      ns("year_select"),
+      "Select Years of Interest:",
+      choices = choices,
+      selected = ""
+    )
+  })
+
+
+  #-Data--------------------------------------------------------------------------------------
+  baseline_data <- reactive({
+    req(shared$budget_results)
+    req(input$year_select)
+
+    bl <-
+      shared$budget_results %>%
+      filter(
+        scenario_name == baseline_shortname(),
+        cost_name == baseline_costname()
+      )
+
+    # Filter by year if a specific year is selected
+    if (input$year_select != "" && input$year_select != "All Years") {
+      bl <- bl %>%
+        filter(year == as.numeric(input$year_select))
+    }
+
+    return(bl)
+  })
+
+  comparison_data <- reactive({
+    req(shared$budget_results)
+    req(input$year_select)
+    req(input$remaining_plan_select)
+    req(comparison_details())
+
+    # Create an empty data frame to store results
+    result_df <- NULL
+
+    # Process each selected comparison plan
+    for (i in seq_along(comparison_details())) {
+      plan_details <- comparison_details()[[i]]
+      plan_label <- comparison_labels()[i]
+
+      # Filter data for this specific plan
+      plan_data <- shared$budget_results %>%
+        filter(
+          scenario_name == plan_details[1],  # Scenario name
+          cost_name == plan_details[2]       # Cost name
+        ) %>%
+        # Add a column to identify which plan this data belongs to
+        mutate(comparison_plan = plan_label)
+
+      # Filter by year if a specific year is selected
+      if (input$year_select != "" && input$year_select != "All Years") {
+        plan_data <- plan_data %>%
+          filter(year == as.numeric(input$year_select))
+      }
+
+      # Add to the result data frame
+      if (is.null(result_df)) {
+        result_df <- plan_data
+      } else {
+        result_df <- bind_rows(result_df, plan_data)
+      }
+    }
+
+    return(result_df)
   })
 
   #-Adding plan description-----------------------------------------------------------------
@@ -76,36 +196,19 @@ tab4Server <-
     )
   })
 
-  #-reactive elements for plans selected (short name for filters)----------------------------
-  baseline_shortname <- reactive({
-    req(input$plan_bl_select)
-    # Extracts something like "Plan A" from a longer string:
-    str_extract(input$plan_bl_select, "Plan\\s+[A-Z]")
-  })
-
-  comparison_shortnames <- reactive({
-    req(input$remaining_plan_select)
-    # For each selected plan, extract the "Plan A" part
-    sapply(input$remaining_plan_select, function(x) str_extract(x, "Plan\\s+[A-Z]"))
-  })
 
   #-Map boxes leaflet-------------------------------------------------------------------------
   output$baseline_map <- renderLeaflet({
-    req(input$plan_bl_select)
-
-    filtered_intervention_mix <-
-      intervention_mix_maps |>
-      filter(plan_shortname == baseline_shortname())
-
+    req(baseline_data())
 
     create_intervention_leaflet(
       lga_outline = lga_outline,
       state_outline = state_outline,
       country_outline = country_outline,
-      intervention_mix = filtered_intervention_mix,
+      intervention_mix_maps = baseline_data(),
       spatial_scale = "National",
-      state_select =  NULL,
-      lga_select =  NULL,
+      state_select = NULL,
+      lga_select = NULL,
       center_lng = 9,
       center_lat = 4,
       zoom = 5.2
@@ -156,142 +259,123 @@ tab4Server <-
 
 
   #-Dynamic UI: Create a tabset panel with a tab for each comparison plan----------------------
+  #-Dynamic UI: Create a tabset panel with a tab for each comparison scenario_name-------------
   output$comparison_tabs <- renderUI({
-    req(input$remaining_plan_select)
+    req(comparison_details())
 
-    # Create a list of tabPanel elements for each comparison plan short name.
-    # Use unname() so that the list is not named (which avoids tabsetPanel errors).
-    tabs <- unname(lapply(comparison_shortnames(), function(plan) {
-      # Create a safe ID by replacing spaces with underscores
-      safe_plan <- gsub(" ", "_", plan)
+    # Extract unique scenario_names only (drop cost_name distinctions)
+    scenario_names <- unique(purrr::map_chr(comparison_details(), ~ .x[1]))
+
+    # Build tab panels for each scenario
+    tabs <- unname(lapply(scenario_names, function(plan) {
+      safe_plan <- gsub(" ", "_", plan)  # sanitize for output ID
       tabPanel(
         title = plan,
         leafletOutput(session$ns(paste0("comparison_map_", safe_plan)))
       )
     }))
 
-    # Use do.call to pass the list of tabs as unnamed arguments
+    # Return as tabsetPanel
     do.call(tabsetPanel, c(list(id = session$ns("comparison_tabset")), tabs))
   })
 
-  #-Dynamic rendering of comparison maps-------------------------------------------------------
+  #-Dynamic rendering of comparison maps (updated for new unified format)-----------------------
   observe({
-    req(comparison_shortnames())
-    for (plan in comparison_shortnames()) {
-      safe_plan <- gsub(" ", "_", plan)
-      output[[paste0("comparison_map_", safe_plan)]] <- renderLeaflet({
-        # Filter your intervention_mix_maps data using the current plan short name
-        filtered_data <- intervention_mix_maps %>%
-          filter(plan_shortname == plan)
+    req(comparison_data())
 
-        # Generate the Leaflet map using your custom function
+    scenario_names <- unique(comparison_data()$scenario_name)
+
+    purrr::walk(scenario_names, function(plan) {
+      safe_id <- gsub(" ", "_", plan)
+
+      plan_data <- comparison_data() %>%
+        filter(scenario_name == plan)
+
+      output[[paste0("comparison_map_", safe_id)]] <- renderLeaflet({
         create_intervention_leaflet(
           lga_outline = lga_outline,
           state_outline = state_outline,
           country_outline = country_outline,
-          intervention_mix = filtered_data,
+          intervention_mix_maps = plan_data,
           spatial_scale = "National",
-          state_select =  NULL,
-          lga_select =  NULL,
+          state_select = NULL,
+          lga_select = NULL,
           center_lng = 9,
           center_lat = 4,
           zoom = 5.2
         )
       })
-    }
+    })
   })
+
 
   #-BUDGET COMPARISON PLOTS------------------------------------------------------------------
 
-  #-Reactive function for Cost Comparison Data----------------
+ #-Reactive function for Cost Comparison Data----------------
   prepare_cost_data <- reactive({
-
     req(input$plan_bl_select, input$remaining_plan_select,
         input$year_select, input$currency_select)
 
-    dat <-
-      national_budget |>
-      filter(
-        currency == input$currency_select,
-        plan_shortname %in% c(baseline_shortname(), comparison_shortnames())
-      ) |>
-      select(
-        plan_shortname,
-        plan_description,
-        year,
-        total_budget
+    baseline <- baseline_data() %>%
+      mutate(
+        plan_label = paste(baseline_shortname(), "with", baseline_costname())
       )
 
-    if (input$year_select == "All Years") {
-      dat <- dat |>
-        group_by(
-          plan_shortname,
-          plan_description,
-         ) |>
-        dplyr::summarise(
-          total_budget = sum(total_budget, na.rm = TRUE)
-        )
-    } else {
-      dat <- dat |>
-        dplyr::filter(year == input$year_select)
-    }
+    comparisons <- comparison_data() %>%
+      mutate(
+        cost_label = paste(scenario_name, "with", cost_name)
+      )
 
-
+    bind_rows(
+      baseline %>% rename(plan_label = plan_label),
+      comparisons %>% rename(plan_label = cost_label)
+    ) %>%
+      filter(currency == input$currency_select) %>%
+      select(plan_label, year, cost_element) %>%
+      group_by(plan_label, year) %>%
+      summarise(total_budget = sum(cost_element, na.rm = TRUE), .groups = "drop")
   })
-
 
   #-Prepare difference data
   prepare_diff_data <- reactive({
-
     req(input$plan_bl_select, input$remaining_plan_select,
         input$year_select, input$currency_select)
 
     currency_symbol <- if (input$currency_select == "USD") "$" else "₦"
 
-    dat <-
-      national_budget |>
-      filter(
-        currency == input$currency_select,
-        plan_shortname %in% c(baseline_shortname(), comparison_shortnames())
-      ) |>
-      select(
-        plan_shortname,
-        plan_description,
-        year,
-        total_budget
-      )
+    baseline_label <- paste(baseline_shortname(), "with", baseline_costname())
 
-    if (input$year_select == "All Years") {
-      dat <- dat |>
-        group_by(
-          plan_shortname,
-          plan_description,
-        ) |>
-        dplyr::summarise(
-          total_budget = sum(total_budget, na.rm = TRUE)
-        )
-    } else {
-      dat <- dat |>
-        dplyr::filter(year == input$year_select)
-    }
+    base <- baseline_data() %>%
+      filter(currency == input$currency_select)
 
-    baseline_cost <- dat$total_budget[dat$plan_shortname ==  baseline_shortname()]
-    req(length(baseline_cost) > 0)
+    comp <- comparison_data() %>%
+      filter(currency == input$currency_select) %>%
+      mutate(plan_label = paste(scenario_name, "with", cost_name))
 
-    dat <- dat %>%
-      filter(plan_shortname %in% c(comparison_shortnames())) %>%
+    # Summarise total budgets
+
+      base_sum <- base %>%
+        summarise(total_budget = sum(cost_element, na.rm = TRUE)) %>%
+        pull(total_budget)
+
+      comp_sum <- comp %>%
+        group_by(plan_label) %>%
+        summarise(total_budget = sum(cost_element, na.rm = TRUE), .groups = "drop")
+
+
+    req(length(base_sum) > 0)
+
+    comp_sum %>%
       mutate(
-        difference_millions = round((total_budget - baseline_cost) / 1e6),
-        percent_change = round((difference_millions * 1e6 / baseline_cost) * 100),
-        label = paste(plan_shortname, " vs ", baseline_shortname()),
-        hover_text = paste0("Difference: ", ifelse(difference_millions >= 0, "+", ""), currency_symbol,
-                            format(difference_millions, big.mark = ","), "M<br>",
-                            "Change from Baseline: ", sprintf("%.0f%%", percent_change))
-
+        difference_millions = round((total_budget - base_sum) / 1e6),
+        percent_change = round((difference_millions * 1e6 / base_sum) * 100),
+        label = paste(plan_label, "vs", baseline_label),
+        hover_text = paste0(
+          "Difference: ", ifelse(difference_millions >= 0, "+", ""), currency_symbol,
+          format(difference_millions, big.mark = ","), "M<br>",
+          "Change from Baseline: ", sprintf("%.0f%%", percent_change)
+        )
       )
-
-
-
   })
 
 
@@ -305,7 +389,7 @@ tab4Server <-
           "Budget comparisons",
           tooltip(
             shiny::icon("info-circle"),
-            "If All Years selected data is summarised for each year of the plan."
+            "If All Years selected data is summarised across each year of the plan."
           )
         ),
         full_screen = FALSE,
@@ -371,12 +455,11 @@ tab4Server <-
     # Your create_budget_table() function returns a DT datatable.
     create_budget_table(
       process_budget_data(
-        plan_select = baseline_shortname(),
-        year_select = input$year_select,
         spatial_scale = "National",
         state_select = NULL,
         lga_select = NULL,
-        currency_select = input$currency_select
+        currency_select = input$currency_select,
+        data = baseline_data()
       )  |>
         dplyr::mutate(total_cost = round(total_cost / 1e6, 0)),
       currency_select = input$currency_select
@@ -385,21 +468,20 @@ tab4Server <-
 
   #-BUIDGET TABLES----------------------------------------------------------------------------
   output$budget_tables_comp <- renderUI({
-    req(input$plan_bl_select != "", comparison_shortnames())
+    req(input$plan_bl_select != "", comparison_labels())
 
-    # Create a card for each comparison plan.
-    cards <- lapply(comparison_shortnames(), function(plan) {
-      safe_plan <- gsub(" ", "_", plan)
+    cards <- lapply(comparison_labels(), function(label) {
+      safe_label <- gsub(" ", "_", label)
       card(
         card_header(
-          paste("Comparison Plan:", plan),
+          paste("Comparison Plan:", label),
           tooltip(
             shiny::icon("info-circle"),
-            "Rows highlighted in Green represent changes from the Baseline plan"
+            "Rows highlighted in Green represent cost decreases, red indicates increases from the Baseline plan"
           )
         ),
         card_body(
-          DT::dataTableOutput(session$ns(paste0("budget_table_comp_", safe_plan)))
+          DT::dataTableOutput(session$ns(paste0("budget_table_comp_", safe_label)))
         )
       )
     })
@@ -408,59 +490,82 @@ tab4Server <-
   })
 
   observe({
-    req(input$plan_bl_select, input$year_select, input$currency_select, comparison_shortnames())
+    req(input$plan_bl_select, input$year_select, input$currency_select, comparison_labels())
 
-    # Get baseline data (used for highlighting differences)
-    baseline_data <- process_budget_data(
-      plan_select = baseline_shortname(),
-      year_select = input$year_select,
+    # 1. Process baseline
+    baseline_processed <- process_budget_data(
       spatial_scale = "National",
       state_select = NULL,
       lga_select = NULL,
-      currency_select = input$currency_select
+      currency_select = input$currency_select,
+      data = baseline_data()
     ) %>%
       dplyr::mutate(total_cost = round(total_cost / 1e6, 0))
 
-    for (plan in comparison_shortnames()) {
-      safe_plan <- gsub(" ", "_", plan)
+    # 2. Process all comparison plans
+    labels <- comparison_labels()
+    comp_data <- comparison_data()
 
-      output[[paste0("budget_table_comp_", safe_plan)]] <- DT::renderDataTable({
-        # Process data for the current comparison plan.
-        comparison_data <- process_budget_data(
-          plan_select = plan,
-          year_select = input$year_select,
-          spatial_scale = "National",
-          state_select = NULL,
-          lga_select = NULL,
-          currency_select = input$currency_select
-        ) %>%
-          dplyr::mutate(total_cost = round(total_cost / 1e6, 0))
+    all_comp_processed <- list()
 
-        # Use create_budget_table() with the baseline data.
+    purrr::walk(labels, function(label) {
+      safe_id <- gsub(" ", "_", label)
+
+      plan_data <- comp_data %>%
+        filter(paste(scenario_name, "with", cost_name) == label)
+
+      processed_comp <- process_budget_data(
+        spatial_scale = "National",
+        state_select = NULL,
+        lga_select = NULL,
+        currency_select = input$currency_select,
+        data = plan_data
+      ) %>%
+        dplyr::mutate(total_cost = round(total_cost / 1e6, 0))
+
+      # Store for plot (optional if you only plot last one)
+      all_comp_processed[[label]] <<- processed_comp
+
+      output[[paste0("budget_table_comp_", safe_id)]] <- DT::renderDataTable({
         create_budget_table(
-          comparison_data,
+          processed_comp,
           currency_select = input$currency_select,
-          baseline_data = baseline_data
+          baseline_data = baseline_processed
         )
       })
-    }
+    })
+
+    # 3. Combine all processed comparison data into one dataframe
+    combined_comp <- dplyr::bind_rows(all_comp_processed, .id = "plan_label")
+
+    # 4. Generate plot (outside purrr::walk!)
+    output$final_cost_plot <- renderPlot({
+      req(input$currency_select)
+      generate_final_cost_plot(
+        baseline_processed = baseline_processed,
+        comparison_processed = combined_comp,
+        currency_select = input$currency_select
+      )
+    })
   })
 
   #-BUDGET FIGURE------------------------------------------------------------------------------
-  output$final_cost_plot <- renderPlot({
-    req(input$plan_bl_select != "", comparison_shortnames(), input$year_select, input$currency_select)
+  # output$final_cost_plot <- renderPlotly({
+  #   req(input$plan_bl_select != "", comparison_shortnames(), input$year_select, input$currency_select)
+  #
+  #   generate_final_cost_plotly(
+  #     currency_select = input$currency_select,
+  #     year_select = input$year_select,
+  #     spatial_scale = "National",
+  #     baseline_plan = baseline_shortname(),
+  #     comp_plans = comparison_shortnames(),
+  #     full_data = shared$budget_results  # or your equivalent input data
+  #   )
+  # })
 
-    generate_final_cost_plot(
-      currency_select = input$currency_select,
-      year_select = input$year_select,
-      spatial_scale = "National",
-      baseline_plan = baseline_shortname(),
-      comp_plans = comparison_shortnames()
-    )
-  })
-
+  #--- UI: Wrap in Card ---
   output$budget_item_plots <- renderUI({
-    req(input$plan_bl_select != "", comparison_shortnames(), input$year_select, input$currency_select)
+    req(input$plan_bl_select != "", input$remaining_plan_select, input$year_select, input$currency_select)
     card(
       card_header(
         "Item Cost Comparisons",

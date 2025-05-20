@@ -1,48 +1,15 @@
 tab2Server <- function(input, output, session, shared) {
   ns <- session$ns
 
-  # Track data load state using a cache
-  scenario_uploads_cache <- reactiveVal(NULL)
-
-  # Trigger to refresh when shared refresh_trigger changes
   observeEvent(shared$refresh_trigger, {
-    message("🔄 Refreshing scenario_uploads from uploaded scenario files...")
-    scenario_uploads_cache(load_all_uploaded_scenarios())
+    message("🔄 Refreshing scenario data in tab2...")
+    shared$reload_scenarios()
   }, ignoreInit = FALSE)
 
-  # Function to read in the uploaded scenarios from the database
-  load_all_uploaded_scenarios <- function(db_path = "scenario_uploads.db", folder = "uploads/scenarios") {
-    db <- DBI::dbConnect(RSQLite::SQLite(), db_path)
-    uploads <- DBI::dbGetQuery(db, "SELECT name, description, filename, years FROM uploads")
-    DBI::dbDisconnect(db)
-
-    if (nrow(uploads) == 0) return(NULL)
-
-    combined_data <- purrr::map_dfr(seq_len(nrow(uploads)), function(i) {
-      row <- uploads[i, ]
-      file_path <- file.path(folder, row$filename)
-
-      if (!file.exists(file_path)) return(NULL)
-
-      year_sheets <- unlist(strsplit(row$years, ","))
-      purrr::map_dfr(year_sheets, function(y) {
-        df <- tryCatch(readxl::read_excel(file_path, sheet = y), error = function(e) NULL)
-        if (is.null(df)) return(NULL)
-
-        df$year <- as.integer(y)
-        df$scenario_name <- row$name
-        df$scenario_description <- row$description
-        df
-      })
-    })
-
-    return(combined_data)
-  }
-
-  # Use cached value for downstream processing
   scenario_uploads <- reactive({
-    scenario_uploads_cache()
+    shared$scenario_uploads_cache()
   })
+
 
   data_available <- reactive({
     df <- scenario_uploads()
@@ -120,10 +87,54 @@ tab2Server <- function(input, output, session, shared) {
     ))
   })
 
+  # Create reactive filtered data based on user selections
+  filtered_data <- reactive({
+    req(data_available(), input$plan_select, input$year_select)
+
+    year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
+      unique(scenario_uploads()$year)
+    } else {
+      input$year_select
+    }
+
+    scenario_uploads() %>%
+      filter(
+        scenario_name == input$plan_select,
+        year %in% year_filter
+      ) %>%
+      select(year, state = adm1, lga=adm2, scenario_name, starts_with("code_"), -code_itn_urban) %>%
+      pivot_longer(
+        cols = starts_with("code_"),
+        names_to = "intervention",
+        names_prefix = "code_",
+        values_to = "included"
+      ) %>%
+      mutate(intervention = case_when(
+          intervention == "cm_public" ~ "Case Management Public",
+          intervention == "cm_private" ~ "Case Management Private",
+          intervention == "iptp" ~ "IPTp",
+          intervention == "vacc" ~ "Vaccine",
+          intervention == "itn_routine" ~ "ITN Routine",
+          intervention == "itn_campaign" ~ "ITN Campaign",
+          intervention == "smc" ~ "SMC",
+          intervention == "pmc" ~ "PMC",
+          intervention == "irs" ~ "IRS",
+          intervention == "lsm" ~ "LSM",
+          TRUE ~ intervention)
+      )
+  })
+
+  observe({
+    req(filtered_data())
+    print(colnames(filtered_data()))
+    print(head(filtered_data()))
+  })
+
   # Get unique interventions from data
   interventions <- reactive({
     req(data_available(), input$plan_select)
-    scenario_uploads() %>%
+    filtered_data() %>%
+      filter(included == 1) |>
       filter(scenario_name == input$plan_select) %>%
       pull(intervention) %>%
       unique() %>%
@@ -148,114 +159,97 @@ tab2Server <- function(input, output, session, shared) {
     }
   })
 
-  # Create reactive filtered data based on user selections
-  filtered_data <- reactive({
-    req(data_available(), input$plan_select)
 
-    year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-      unique(scenario_uploads$year)
-    } else {
-      input$year_select
-    }
-
-    scenario_uploads() %>%
-      filter(
-        scenario_name == input$plan_select,
-        year %in% year_filter
-      )
-  })
-
-  # Check for SMC and PMC overlap
-  smc_pmc_overlap <- reactive({
-    req(data_available(), input$plan_select)
-
-    year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-      unique(scenario_uploads$year)
-    } else {
-      input$year_select
-    }
-
-    # Which LGAs are receiving PMC each year
-    pmc_tmp <- scenario_uploads() %>%
-      st_drop_geometry() %>%
-      filter(scenario_name == input$plan_select,
-             intervention == "PMC")
-
-    # Apply year filter if provided
-    if (!is.null(year_filter) && length(year_filter) > 0) {
-      pmc_tmp <- pmc_tmp %>%
-        filter(year %in% year_filter)
-    }
-
-    pmc_tmp <- pmc_tmp %>%
-      distinct(year, state, lga, intervention)
-
-    # Which LGAs are receiving SMC each year
-    smc_tmp <- scenario_uploads() %>%
-      st_drop_geometry() %>%
-      filter(scenario_name == input$plan_select,
-             intervention == "SMC")
-
-    # Apply year filter if provided
-    if (!is.null(year_filter) && length(year_filter) > 0) {
-      smc_tmp <- smc_tmp %>%
-        filter(year %in% year_filter)
-    }
-
-    smc_tmp <- smc_tmp %>%
-      distinct(year, state, lga, intervention)
-
-    # Complete join by year, state, and lga
-    smc_pmc <- inner_join(pmc_tmp, smc_tmp, by = c("year", "state", "lga")) %>%
-      select(year, state, lga)
-
-    # If none, return NULL, otherwise return overlap data
-    if (nrow(smc_pmc) == 0) {
-      NULL
-    } else {
-      smc_pmc
-    }
-  })
+  # # Check for SMC and PMC overlap
+  # smc_pmc_overlap <- reactive({
+  #   req(data_available(), input$plan_select, input$year_select)
+  #
+  #   year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
+  #     unique(scenario_uploads()$year)
+  #   } else {
+  #     input$year_select
+  #   }
+  #
+  #   # Which LGAs are receiving PMC each year
+  #   pmc_tmp <- filtered_data() %>%
+  #     filter(
+  #       intervention == "PMC",
+  #       included == 1
+  #     ) %>%
+  #     distinct(year, state, lga)
+  #
+  #   # Apply year filter if provided
+  #   if (!is.null(year_filter) && length(year_filter) > 0) {
+  #     pmc_tmp <-
+  #       pmc_tmp %>%
+  #       filter(year %in% year_filter)
+  #   }
+  #
+  #   # Which LGAs are receiving SMC each year
+  #   smc_tmp <-
+  #     filter(
+  #       intervention == "SMC",
+  #       included == 1
+  #     ) %>%
+  #     distinct(year, state, lga)
+  #
+  #   # Apply year filter if provided
+  #   if (!is.null(year_filter) && length(year_filter) > 0) {
+  #     smc_tmp <- smc_tmp %>%
+  #       filter(year %in% year_filter)
+  #   }
+  #
+  #   # Complete join by year, state, and lga
+  #   smc_pmc <- inner_join(pmc_tmp, smc_tmp, by = c("year", "state", "lga")) %>%
+  #     select(year, state, lga)
+  #
+  #   # If none, return NULL, otherwise return overlap data
+  #   if (nrow(smc_pmc) == 0) {
+  #     NULL
+  #   } else {
+  #     smc_pmc
+  #   }
+  # })
 
   # Generate warning if SMC and PMC overlap
-  output$smc_pmc_warning <- renderUI({
-    req(data_available())
-    overlap_data <- smc_pmc_overlap()
-
-    if (!is.null(overlap_data) && nrow(overlap_data) > 0) {
-      # Create a formatted table of the overlapping areas
-      overlap_html <- overlap_data %>%
-        arrange(year, state, lga) %>%
-        mutate(
-          display_text = paste0(year, ": ", state, " - ", lga)
-        ) %>%
-        pull(display_text) %>%
-        paste(collapse = ", ")
-
-      # Display warning message with the overlapping areas
-      card(
-        card_header(
-          class = "bg-warning text-white",
-          tags$div(
-            class = "d-flex align-items-center",
-            bsicons::bs_icon("exclamation-triangle-fill", size = "1.5rem", class = "me-2"),
-            "Warning: PMC and SMC Overlap Detected"
-          )
-        ),
-        card_body(
-          tags$div(
-            tags$p("The following LGAs have both PMC and SMC interventions scheduled for the same year. This may be unintended and should be reviewed:"),
-            tags$div(style = "max-height: 150px; overflow-y: auto;",
-                     tags$p(HTML(overlap_html))
-            )
-          )
-        )
-      )
-    } else {
-      # No overlap, don't display anything
-      NULL
-    }
-  })
+  # output$smc_pmc_warning <- renderUI({
+  #   req(data_available())
+  #   overlap_data <- smc_pmc_overlap()
+  #
+  #   if (!is.null(overlap_data) && nrow(overlap_data) > 0) {
+  #     # Create a formatted table of the overlapping areas
+  #     overlap_html <- overlap_data %>%
+  #       arrange(year, state, lga) %>%
+  #       mutate(
+  #         display_text = paste0(year, ": ", state, " - ", lga)
+  #       ) %>%
+  #       pull(display_text) %>%
+  #       paste(collapse = ", ")
+  #
+  #     # Display warning message with the overlapping areas
+  #     card(
+  #       card_header(
+  #         class = "bg-warning text-white",
+  #         tags$div(
+  #           class = "d-flex align-items-center",
+  #           bsicons::bs_icon("exclamation-triangle-fill", size = "1.5rem", class = "me-2"),
+  #           "Warning: PMC and SMC Overlap Detected"
+  #         )
+  #       ),
+  #       card_body(
+  #         tags$div(
+  #           tags$p("The following LGAs have both PMC and SMC interventions scheduled for the same year. This may be unintended and should be reviewed:"),
+  #           tags$div(style = "max-height: 150px; overflow-y: auto;",
+  #                    tags$p(HTML(overlap_html))
+  #           )
+  #         )
+  #       )
+  #     )
+  #   } else {
+  #     # No overlap, don't display anything
+  #     NULL
+  #   }
+  # })
 
   # Generate tabs for each intervention
   output$intervention_tabs <- renderUI({
@@ -270,7 +264,7 @@ tab2Server <- function(input, output, session, shared) {
 
     # Get year filter once for all interventions
     year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-      unique(scenario_uploads$year)
+      unique(scenario_uploads()$year)
     } else {
       input$year_select
     }
@@ -281,7 +275,8 @@ tab2Server <- function(input, output, session, shared) {
       coverage_data <- count_lga_coverage(
         intervention = intervention,
         plan = input$plan_select,
-        year_filter = year_filter
+        year_filter = year_filter,
+        data = filtered_data()
       )
 
       # Calculate states with full, partial, and no coverage for this specific intervention
@@ -334,6 +329,8 @@ tab2Server <- function(input, output, session, shared) {
     # Only create the card if we have intervention panels
     if (length(intervention_panels) > 0) {
       card(
+        full_screen = TRUE,
+        height = 900,
         card_header(paste0("LGA Coverage for Plan: ", input$plan_select)),
         card_body(
           do.call(navset_card_tab, c(
@@ -364,7 +361,7 @@ tab2Server <- function(input, output, session, shared) {
 
           # Get year filter
           year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-            unique(scenario_uploads$year)
+            unique(scenario_uploads()$year)
           } else {
             input$year_select
           }
@@ -373,7 +370,8 @@ tab2Server <- function(input, output, session, shared) {
           data_table <- count_lga_coverage(
             intervention = local_intervention,
             plan = input$plan_select,
-            year_filter = year_filter
+            year_filter = year_filter,
+            data = filtered_data()
           )
 
           # Format the table using DT
@@ -417,3 +415,5 @@ tab2Server <- function(input, output, session, shared) {
     updateSelectInput(session, "year_select", selected = "")
   })
 }
+
+

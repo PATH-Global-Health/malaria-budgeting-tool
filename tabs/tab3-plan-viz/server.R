@@ -1,46 +1,236 @@
-
 tab3Server <- function(input, output, session, lga_outline, state_outline, country_outline,
-                       intervention_mix_maps, static_mix_maps) {
+                       shared) {
+  # Namespace for the session
+  ns <- session$ns
 
-  #-check if data avaliable and add message if not-----------------------------------------------
-  data_ready <- reactive({
-    !is.null(intervention_mix_maps) && nrow(intervention_mix_maps) > 0 &&
-      !is.null(static_mix_maps) && nrow(static_mix_maps) > 0
+  # Create a local reactiveVal to track data availability specifically for this tab
+  local_data_available <- reactiveVal(FALSE)
+
+  # Add reactive for scenario data
+  scenario_data <- reactive({
+    cache <- shared$scenario_uploads_cache
+    if (is.null(cache) || !is.reactive(cache)) return(NULL)
+    cache()
   })
 
+  # Observe new uploads or changes from the shared state
+  observeEvent(shared$refresh_trigger, {
+    message("🔄 Refreshing data in tab3...")
+    shared$reload_all_uploads()
+  }, ignoreInit = FALSE)
+
+  # Check data availability once at startup
   observe({
-    if (!data_ready()) {
-      output$page_description <- renderUI({
-        card(
-          card_header("Budgets Not Yet Generated"),
-          card_body(
-            tags$p("Budgets not yet generated - return to the 'Generate Budgets' tab to specificy budget generation"),
-            tags$p("Once generated, return to this tab to view the generated budgets")
-          )
-        )
-      })
+    # Only run this once when the module initializes
+    if (!is.null(shared$budget_results) &&
+        is.data.frame(shared$budget_results) &&
+        nrow(shared$budget_results) > 0) {
+      message("Tab3: Budget data availability detected. Rows: ", nrow(shared$budget_results))
+      local_data_available(TRUE)
+    } else {
+      message("Tab3: No budget data available at startup")
+      local_data_available(FALSE)
+    }
+  }, priority = 1000)
+
+  # Log scenario data when available
+  observe({
+    req(scenario_data())
+    message("📊 Scenario data is available in tab3. Rows: ", nrow(scenario_data()))
+
+    # For debugging, log some basic info about the scenario data
+    if (nrow(scenario_data()) > 0) {
+      message("📊 Scenario data overview:")
+      if ("scenario_name" %in% colnames(scenario_data())) {
+        unique_scenarios <- unique(scenario_data()$scenario_name)
+        message("Available scenarios: ", paste(unique_scenarios, collapse=", "))
+      }
+      if ("year" %in% colnames(scenario_data())) {
+        years <- sort(unique(scenario_data()$year))
+        message("Available years: ", paste(years, collapse=", "))
+      }
+    }
+  }, priority = 900)
+
+  # Only check data when the reload button is clicked
+  observeEvent(input$reload_budget_data, {
+    message("Tab3: Manual reload of budget data requested")
+    shared$reload_budgets()
+
+    # Update local availability after reload
+    if (!is.null(shared$budget_results) &&
+        is.data.frame(shared$budget_results) &&
+        nrow(shared$budget_results) > 0) {
+      message("Tab3: Budget data availability detected after reload. Rows: ", nrow(shared$budget_results))
+      local_data_available(TRUE)
+    } else {
+      message("Tab3: No budget data available after reload")
+      local_data_available(FALSE)
     }
   })
 
-  #-Reactive: Filter intervention mix data based on selected plan--------------------------------
-  filtered_intervention_mix <- reactive({
-    req(input$plan_select)
-    intervention_mix_maps[intervention_mix_maps$plan_shortname == input$plan_select, ]
+  # Use the local reactiveVal for data readiness checks
+  data_ready <- reactive({
+    return(local_data_available())
   })
 
-  #-Reactive: Filter static mix data for selected plan & year-------------------------------------
-  filtered_static_mix <- reactive({
+  # Reactive expression to get unique plans from generated budgets
+  available_plans <- reactive({
+    req(local_data_available())
+    req(shared$budget_results)
+
+    # Extract unique combinations of source_scenario and source_cost
+    plan_combinations <- shared$budget_results %>%
+      select(source_scenario, source_cost) %>%
+      distinct() %>%
+      mutate(plan_label = paste0(source_scenario, " with ", source_cost))
+
+    return(plan_combinations)
+  })
+
+  # Reactive expression to get unique years from generated budgets
+  available_years <- reactive({
+    req(local_data_available())
+    req(shared$budget_results)
+
+    # Extract unique years
+    years <- sort(unique(shared$budget_results$year))
+
+    return(years)
+  })
+
+  # Generate dynamic plan selection UI
+  output$plan_select_ui <- renderUI({
+    plans <- available_plans()
+
+    if (is.null(plans) || nrow(plans) == 0) {
+      return(selectInput(
+        ns("plan_select"),
+        "Select the Plan:",
+        choices = c("No plans available - generate budgets first"),
+        selected = NULL
+      ))
+    }
+
+    # Create choices with labels and values
+    choices <- c("", setNames(
+      paste0(plans$source_scenario, "|||", plans$source_cost),
+      plans$plan_label
+    ))
+
+    selectInput(
+      ns("plan_select"),
+      "Select the Plan:",
+      choices = choices,
+      selected = ""
+    )
+  })
+
+  # year selection
+  output$year_select_ui <- renderUI({
+    years <- available_years()
+
+    if (is.null(years) || length(years) == 0) {
+      return(selectInput(
+        ns("year_select"),
+        "Select Years of Interest:",
+        choices = c("No years available - generate budgets first"),
+        selected = NULL
+      ))
+    }
+
+    # Create choices - only include "All Years" if there's more than one year
+    if (length(years) > 1) {
+      choices <- c("", as.character(years), "All Years")
+    } else {
+      choices <- c("", as.character(years))
+    }
+
+    selectInput(
+      ns("year_select"),
+      "Select Years of Interest:",
+      choices = choices,
+      selected = ""
+    )
+  })
+
+  # Scenario data panel for debugging
+  output$scenario_data_info <- renderUI({
+    req(scenario_data())
+
+    # Create a summary of the scenario data
+    if (nrow(scenario_data()) > 0) {
+      unique_scenarios <- unique(scenario_data()$scenario_name)
+      scenario_years <- scenario_data() %>%
+        group_by(scenario_name) %>%
+        summarize(years = paste(sort(unique(year)), collapse=", "))
+
+      html_content <- "<h4>Available Scenarios:</h4><ul>"
+      for (i in 1:nrow(scenario_years)) {
+        html_content <- paste0(html_content,
+                               "<li><strong>", scenario_years$scenario_name[i],
+                               "</strong>: Years (", scenario_years$years[i], ")</li>")
+      }
+      html_content <- paste0(html_content, "</ul>")
+
+      return(HTML(html_content))
+    } else {
+      return(HTML("<p>No scenario data available</p>"))
+    }
+  })
+
+  # Parse the selected plan to get scenario and cost
+  selected_plan_details <- reactive({
     req(input$plan_select)
 
-    static_mix_maps |>
-      filter(plan_shortname == input$plan_select)
+    if (input$plan_select == "") {
+      return(NULL)
+    }
 
+    # Split the combined value to get scenario and cost
+    split_value <- strsplit(input$plan_select, "\\|\\|\\|")[[1]]
+
+    if (length(split_value) == 2) {
+      return(list(
+        scenario = split_value[1],
+        cost = split_value[2]
+      ))
+    } else {
+      return(NULL)
+    }
+  })
+
+  # Filter the budget results based on user selections
+  filtered_budget <- reactive({
+    req(shared$budget_results)
+    req(selected_plan_details())
+    req(input$year_select)
+
+    result <- shared$budget_results %>%
+      filter(
+        scenario_name == selected_plan_details()$scenario,
+        cost_name == selected_plan_details()$cost
+      )
+
+    # Filter by year if a specific year is selected
+    if (input$year_select != "" && input$year_select != "All Years") {
+      result <- result %>%
+        filter(year == as.numeric(input$year_select))
+    }
+
+    return(result)
+  })
+
+  observe({
+    req(filtered_budget())
+    message("Filtered budget data: ", nrow(filtered_budget()), " rows")
+    # Can add more debug info here
   })
 
   #-Reactive: Filter LGA list based on selected state----------------------------------------
   lga_list <- reactive({
     req(input$state_select)
-    unique(lga_outline$lga[lga_outline$state == input$state_select])
+     unique(lga_outline$lga[lga_outline$state == input$state_select])
   })
 
   #-Generate UI for State Selection----------------------------------------------------------
@@ -69,38 +259,53 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
   #-Adding plan description-----------------------------------------------------------------
   output$page_description <- renderUI({
-    req(input$plan_select, input$year_select, input$spatial_scale)  # Ensure inputs are selected
+    req(input$plan_select, input$year_select, input$spatial_scale)
+    req(filtered_budget())  # Make sure filtered budget data is available
 
-    # Extract the plan description from the dataset
-    plan_desc <-
-      intervention_mix_maps |>
-      filter(plan_shortname == input$plan_select) |>
-      pull(plan_description) |>
-      unique()  # Ensure we only get one unique description
+    # Check if scenario_description column exists and get scenario description
+    if ("scenario_description" %in% colnames(filtered_budget())) {
+      plan_desc <- filtered_budget() %>%
+        pull(scenario_description) %>%
+        unique()
+    } else {
+      # Fallback to scenario_name if description isn't available
+      plan_desc <- selected_plan_details()$scenario
+    }
 
-    if (length(plan_desc) == 0) plan_desc <- "No description available"  # Default if missing
+    # Check if cost_description column exists and get cost description
+    if ("cost_description" %in% colnames(filtered_budget())) {
+      cost_desc <- filtered_budget() %>%
+        pull(cost_description) %>%
+        unique()
+    } else {
+      # Fallback to cost_name if description isn't available
+      cost_desc <- selected_plan_details()$cost
+    }
 
-    # Start with the base description
+    if (length(plan_desc) == 0) plan_desc <- "No description available"
+    if (length(cost_desc) == 0) cost_desc <- "No cost description available"
+
+    # Build the description HTML
     description <- paste0("<h4>Displaying results for ", input$plan_select,
                           " at the ", input$spatial_scale, " level for year: ", input$year_select, "</h4>")
 
-    # If "State" is selected, include the state name
     if (input$spatial_scale == "State" && !is.null(input$state_select) && input$state_select != "") {
       description <- paste0(description, "<h4>State: ", input$state_select, "</h4>")
     }
 
-    # If "LGA" is selected, include both state and LGA names
     if (input$spatial_scale == "LGA" && !is.null(input$state_select) && input$state_select != "" &&
         !is.null(input$lga_select) && input$lga_select != "") {
       description <- paste0(description, "<h4>State: ", input$state_select, " | LGA: ", input$lga_select, "</h4>")
     }
 
-    # Add the plan description in a new row
-    description <- paste0(description, "<h5><strong>Plan Description:</strong> ", plan_desc, "</h5>")
+    # Add both the plan description and cost description
+    description <- paste0(description,
+                          "<h5><strong>Plan Description:</strong> ", plan_desc, "</h5>",
+                          "<h5><strong>Cost Description:</strong> ", cost_desc, "</h5>")
 
-    # Render the HTML output
     HTML(description)
   })
+
 
   #-Generate the interactive map-----------------------------------------------------------
   output$interactive_map <- renderLeaflet({
@@ -118,7 +323,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
       lga_outline = lga_outline,
       state_outline = state_outline,
       country_outline = country_outline,
-      intervention_mix = filtered_intervention_mix(),
+      intervention_mix = filtered_budget(),
       spatial_scale = input$spatial_scale,
       state_select = input$state_select,
       lga_select = input$lga_select,
@@ -133,7 +338,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
   observe({
     req(input$plan_select)
 
-    years <- unique(static_mix_maps$year)
+    years <- unique(filtered_budget()$year)
     if (length(years) == 0) return(NULL)
 
     # Create a tab for each available year plus one for "All Years".
@@ -142,7 +347,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
         create_static_map(
           lga_outline = lga_outline,
           state_outline = state_outline,
-          filtered_data = filtered_static_mix(),
+          filtered_data = filtered_budget(),
           plan_select = input$plan_select,
           spatial_scale = input$spatial_scale,
           state_select = input$state_select,
@@ -157,11 +362,12 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
   output$static_map_tabs <- renderUI({
     req(input$plan_select)
 
-    years <- unique(static_mix_maps$year)
+    years <- unique(filtered_budget()$year)
     if (length(years) == 0) return(NULL)  # Prevent crash if no data
+    # if (length(years >1)) years <- c(years, "All Years")
 
     navset_tab(
-      !!!lapply(c(years, "All Years"), function(y) {
+      !!!lapply(c(years), function(y) {
         nav_panel(
           title = paste(y),
           plotOutput(session$ns(paste0("static_map_", y)), height = "500px")
@@ -227,12 +433,12 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
     }
 
     create_icon_summaries(
-      plan_select = input$plan_select,
-      year_select = input$year_select,
       spatial_scale = input$spatial_scale,
       state_select = input$state_select,
       lga_select = input$lga_select,
-      currency_select = input$currency_select
+      currency_select = input$currency_select,
+      data = filtered_budget(),
+      year_select = input$year_select
     )
   })
 
@@ -266,12 +472,11 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
     # Your create_budget_table() function returns a DT datatable.
     create_budget_table(
       process_budget_data(
-        plan_select = input$plan_select,
-            year_select = input$year_select,
             spatial_scale = input$spatial_scale,
             state_select = input$state_select,
             lga_select = input$lga_select,
-            currency_select = input$currency_select
+            currency_select = input$currency_select,
+            data = filtered_budget()
       ),
       currency_select = input$currency_select
     )
@@ -294,12 +499,11 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
     donut_plot(
       process_budget_data(
-        plan_select = input$plan_select,
-        year_select = input$year_select,
         spatial_scale = input$spatial_scale,
         state_select = input$state_select,
         lga_select = input$lga_select,
-        currency_select = input$currency_select
+        currency_select = input$currency_select,
+        data = filtered_budget()
       )
     )
   })
@@ -319,12 +523,11 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
     treemap_plot(
       process_budget_data(
-        plan_select = input$plan_select,
-        year_select = input$year_select,
         spatial_scale = input$spatial_scale,
         state_select = input$state_select,
         lga_select = input$lga_select,
-        currency_select = input$currency_select
+        currency_select = input$currency_select,
+        data = filtered_budget()
       ),
       currency_select = input$currency_select
     )
@@ -345,16 +548,40 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
     stacked_plot(
       process_item_data(
-        plan_select = input$plan_select,
-        year_select = input$year_select,
         spatial_scale = input$spatial_scale,
         state_select = input$state_select,
         lga_select = input$lga_select,
-        currency_select = input$currency_select
+        currency_select = input$currency_select,
+        data = filtered_budget()
       ),
       currency_select = input$currency_select
     )
   })
+
+  #-stacked % bar chart---------------------
+  output$stacked_prop <-
+    renderPlotly({
+      req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+      # For spatial scales that require a state selection, ensure input$state_select exists
+      if (input$spatial_scale %in% c("State", "LGA")) {
+        req(input$state_select)
+      }
+      # For LGA level, require an LGA selection
+      if (input$spatial_scale == "LGA") {
+        req(input$lga_select)
+      }
+
+      stacked_plot_prop(
+        process_item_data(
+          spatial_scale = input$spatial_scale,
+          state_select = input$state_select,
+          lga_select = input$lga_select,
+          currency_select = input$currency_select,
+          data = filtered_budget()
+        ),
+        currency_select = input$currency_select
+      )
+    })
 
   #-lolipop chart---------------------------
   output$lolipop_chart <- renderPlotly({
@@ -371,12 +598,11 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
     lolipop_plot(
       process_item_data(
-        plan_select = input$plan_select,
-        year_select = input$year_select,
         spatial_scale = input$spatial_scale,
         state_select = input$state_select,
         lga_select = input$lga_select,
-        currency_select = input$currency_select
+        currency_select = input$currency_select,
+        data = filtered_budget()
       ),
       currency_select = input$currency_select
     )
@@ -391,11 +617,10 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
     cost_dist_map(
       map_level = "State",
-      plan_select = input$plan_select,
       currency_select = input$currency_select,
       map_type = "total",
-      year_select = input$year_select,
-      state_select = input$state_select  # Pass selected state for highlighting
+      state_select = input$state_select,
+      data = filtered_budget()
     )
   })
 
@@ -408,11 +633,10 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
     cost_dist_map(
       map_level = "State",
-      plan_select = input$plan_select,
       currency_select = input$currency_select,
       map_type = "per person",
-      year_select = input$year_select,
-      state_select = input$state_select
+      state_select = input$state_select,
+      data = filtered_budget()
     )
   })
 
@@ -428,12 +652,11 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
     cost_dist_map(
       map_level = "LGA",
-      plan_select = input$plan_select,
       currency_select = input$currency_select,
       map_type = "total",
-      year_select = input$year_select,
-      state_select = input$state_select,    # Needed to filter the LGA shapefile correctly
-      lga_select = input$lga_select         # Highlight the selected LGA
+      state_select = input$state_select,
+      lga_select = input$lga_select,
+      data = filtered_budget()
     )
   })
 
@@ -449,17 +672,16 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
     cost_dist_map(
       map_level = "LGA",
-      plan_select = input$plan_select,
       currency_select = input$currency_select,
       map_type = "per person",
-      year_select = input$year_select,
       state_select = input$state_select,
-      lga_select = input$lga_select
+      lga_select = input$lga_select,
+      data = filtered_budget()
     )
   })
 
 
-#-PLOT ELEMENTS-------------------------------------------------------------------------
+# #-PLOT ELEMENTS-------------------------------------------------------------------------
   output$cost_charts <- renderUI({
     req(input$plan_select != "")
 
@@ -509,7 +731,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
         title = "Intervention Cost Summaries",
         nav_panel(
           "Plot 1",
-          card_title("Cost Breakdown by Category per Budget Item"),
+          card_title("Cost Breakdown by Category per Intervention"),
           card_body(
             class = "p-0",
             plotlyOutput(session$ns("stacked_barchart"))
@@ -517,15 +739,19 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
         ),
         nav_panel(
           "Plot 2",
+          card_title("% Contribution by Category per Intervention"),
+          card_body(
+            class = "p-0",
+            plotlyOutput(session$ns("stacked_prop"))
+          )
+        ),
+        nav_panel(
+          "Plot 3",
           card_title("Top 15 Specific Cost Components"),
           card_body(
             class = "p-0",
             plotlyOutput(session$ns("lolipop_chart"))
           )
-        ),
-        nav_panel(
-          "Plot 3",
-          card_title(" ")
 
         ),
         nav_panel(
