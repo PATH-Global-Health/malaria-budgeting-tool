@@ -1,139 +1,126 @@
-tab5Server <- function(input, output, session) {
+tab5Server <- function(input, output, session, shared) {
   ns <- session$ns
 
-  #-Observe universal inputs and enable/disable download buttons-----------------------------
-  observe({
-    all_selected <- (
-      length(input$plan_select) > 0 &&
-        input$plan_select[1] != "" &&  # Check that the first selected value is not ""
-        input$year_select != "" &&
-        input$currency_select != ""
-    )
-
-    if (all_selected) {
-      shinyjs::enable("download_report")
-      shinyjs::enable("download_figures")
-      shinyjs::enable("download_data")
-    } else {
-      shinyjs::disable("download_report")
-      shinyjs::disable("download_figures")
-      shinyjs::disable("download_data")
-    }
+  # -- Extract reactive budget results --
+  budget_data <- reactive({
+    req(shared$budget_results)
+    shared$budget_results
   })
 
-  #-Report Download------------------------------------------------------------------------
+  # -- UI Elements: Plan, Year, Currency selectors --
+  output$plan_ui <- renderUI({
+    req(budget_data())
+    choices <- sort(unique(budget_data()$source_scenario))
+    selectInput(ns("plan_select"), "Select Plan(s)", choices = choices, multiple = TRUE)
+  })
+
+  output$year_ui <- renderUI({
+    req(budget_data())
+    choices <- sort(unique(budget_data()$year))
+    selectInput(ns("year_select"), "Select Year", choices = c(choices))
+  })
+
+  output$currency_ui <- renderUI({
+    req(budget_data())
+    choices <- sort(unique(budget_data()$currency))
+    selectInput(ns("currency_select"), "Select Currency", choices = choices)
+  })
+
+  # -- Enable/disable buttons based on input validation --
+  observe({
+    all_selected <- !is.null(input$plan_select) &&
+      length(input$plan_select) > 0 &&
+      !is.null(input$year_select) &&
+      input$year_select != "" &&
+      !is.null(input$currency_select) &&
+      input$currency_select != ""
+
+    shinyjs::toggleState("download_report", condition = all_selected)
+    shinyjs::toggleState("download_figures", condition = all_selected)
+    shinyjs::toggleState("download_data", condition = all_selected)
+  })
+
+  # -- Report download handler --
   output$download_report <- downloadHandler(
     filename = function() {
-      # Collapse multiple plans into a single string for the filename
       plan_text <- paste(input$plan_select, collapse = "_")
-      paste0(
-        plan_text,
-        "-report-summary-for-",
-        input$year_select,
-        "-date-generated-",
-        Sys.Date(),
-        ".docx"
-      )
+      paste0(plan_text, "-report-summary-", input$year_select, "-", Sys.Date(), ".docx")
     },
     content = function(file) {
-      # Define the path to the R Markdown template
       template_path <- file.path("global", "report-template.Rmd")
-
-      if (!file.exists(template_path)) {
-        stop("Template file not found: ", template_path)
-      }
+      req(file.exists(template_path))
 
       temp <- tempdir()
-
-      # Copy the template to a temporary file location
-      tempReport <- file.path(temp, "report_template.Rmd")
-      file.copy(template_path, tempReport, overwrite = TRUE)
-
-      # Copy test figures to temporary file location
+      temp_report <- file.path(temp, "report_template.Rmd")
+      file.copy(template_path, temp_report, overwrite = TRUE)
       file.copy(file.path("global", "test.png"), file.path(temp, "test.png"))
       file.copy(file.path("global", "test-2.png"), file.path(temp, "test-2.png"))
 
-      # Determine the output format (currently fixed to Word)
-      output_format <- "word_document"
-
-      # Render the report using rmarkdown::render with passed parameters
       rmarkdown::render(
-        tempReport,
-        output_format = output_format,
+        temp_report,
+        output_format = "word_document",
         output_file = file,
         params = list(
-          report_title   = input$report_title,
-          authors_list   = input$authors_list,
-          plan_select    = input$plan_select,
+          report_title    = input$report_title,
+          authors_list    = input$authors_list,
+          plan_select     = input$plan_select,
           year_select     = input$year_select,
-          lga_outline    = lga_outline,
-          state_outline  = state_outline,
-          national_budget  = national_budget
+          currency_select = input$currency_select,
+          lga_outline     = lga_outline,
+          state_outline   = state_outline,
+          national_budget = budget_data()
         ),
         envir = new.env(parent = globalenv())
       )
     }
   )
 
-
-
-  #-Figures Download Handler--------------------------------------------------------------
+  # -- Figures download handler --
   output$download_figures <- downloadHandler(
     filename = function() {
-      paste0("figures-", input$plan_select, "-", Sys.Date(), ".zip")
+      paste0("figures-", paste(input$plan_select, collapse = "_"), "-", Sys.Date(), ".zip")
     },
     content = function(file) {
       withProgress(message = 'Generating Figures', value = 0, {
-        # Step 1: Create a temporary directory
-        incProgress(0.1, detail = "Creating temporary folder")
+        incProgress(0.1)
         tmp_dir <- tempfile("figures")
         dir.create(tmp_dir)
 
-        # Step 2: Generate the plots based on current inputs
-        # just using the static intervention map as an
-        # example
-        incProgress(0.2, detail = "Generating plots")
-        plots <-
-          generate_plots(
-            input$plan_select,
-            input$year_select,
-            input$currency_select
-            )
+        plots <- generate_plots(
+          plans = input$plan_select,
+          year = input$year_select,
+          currency = input$currency_select
+        )
 
-        # Step 3: Save each plot as a PNG file
-        incProgress(0.2, detail = "Saving plots as PNG files")
         plot_files <- c()
-        n <- length(plots)
         for (plot_name in names(plots)) {
           plot_file <- file.path(tmp_dir, paste0(plot_name, ".png"))
-          png(filename = plot_file, width = 800, height = 600)
+          png(plot_file, width = 800, height = 600)
           print(plots[[plot_name]])
           dev.off()
           plot_files <- c(plot_files, plot_file)
-          incProgress(0.2 / n, detail = paste("Saved", plot_name))
         }
 
-        # Step 4: Zip the PNG files
-        incProgress(0.2, detail = "Zipping files")
         utils::zip(zipfile = file, files = plot_files, flags = "-j")
-
-        incProgress(0.1, detail = "Complete")
       })
     },
     contentType = "application/zip"
   )
 
-  #-Data Download Handler------------------------------------------------------------------
+  # -- Raw budget data download handler --
   output$download_data <- downloadHandler(
     filename = function() {
-      paste0("data-", Sys.Date(), ".xlsx")
+      paste0("budget-data-", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      # Define the path to the existing file
-      existing_file <- "data/nga-demo-data-pre-processed/budgets-generated/combined-plan-budgets.xlsx"
+      data_to_write <- budget_data() |>
+        filter(
+          source_scenario %in% input$plan_select,
+          currency == input$currency_select,
+          if (input$year_select != "All Years") year == as.numeric(input$year_select) else TRUE
+        )
 
-      # Copy the existing file to the requested download location
-      file.copy(existing_file, file)
+      openxlsx::write.xlsx(data_to_write, file)
     },
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )

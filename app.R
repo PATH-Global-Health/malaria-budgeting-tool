@@ -66,21 +66,21 @@ ui <- page_fluid(
   #-Sidebar Navigation------------------------------------
   div(
     class = "sidebar-container",
-    h3("Malaria Budget Comparison Tool"),
-    # tags$a(
-    #   href = 'https://www.path.org/who-we-are/programs/malaria/malaria-control-and-elimination-partnership-in-africa-macepa/',
-    #   icon("house"),
-    #   title = "Go to PATH Malaria Page"
-    # ),
-    # br(),
-    # actionLink("info", label = "", icon = icon("info"), title = "Info"),
-    # br(),
-    # tags$a(
-    #   href = "mailto:hthompson@path.org",
-    #   icon("comments"),
-    #   title = "Message Team"
-    # ),
-    # br(),
+    h3("DEMO Malaria Budget Comparison Tool"),
+    tags$a(
+      href = 'https://www.path.org/who-we-are/programs/malaria/malaria-control-and-elimination-partnership-in-africa-macepa/',
+      icon("house"),
+      title = "Go to PATH Malaria Page"
+    ),
+    br(),
+    actionLink("info", label = "", icon = icon("info"), title = "Info"),
+    br(),
+    tags$a(
+      href = "mailto:hthompson@path.org",
+      icon("comments"),
+      title = "Message Team"
+    ),
+    br(),
     br(),
     navset_pill_list(
       id = "sidebar_menu",
@@ -157,7 +157,7 @@ server <- function(input, output, session) {
   callModule(tab3Server, "tab3", lga_outline, state_outline, country_outline,
                shared)
   callModule(tab4Server, id = "tab4", lga_outline, state_outline, country_outline, shared)
-  callModule(tab5Server, id = "tab5")
+  callModule(tab5Server, id = "tab5", shared)
   callModule(tab6Server, id = "tab6")
 }
 

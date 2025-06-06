@@ -402,6 +402,15 @@ tab2aServer <- function(input, output, session, shared) {
 
   # generate budgets
   observeEvent(input$generate_budgets, {
+    if (lite_mode) {
+      showModal(modalDialog(
+        title = "Feature Disabled",
+        "Budget generation is disabled in this demonstration version of the tool.
+      This button is provided for illustrative purposes only.",
+        easyClose = TRUE
+      ))
+      return()
+    }
     req(matrix_selections(), data_available())
 
     # Show loading indicator

@@ -160,35 +160,10 @@ target_population <-
   )
 
 
+# define app as lite mode to suspend upload and delete ability
+lite_mode <- TRUE
 
 
 
 
-
-# create empty elements that will get filled by the tool
-intervention_mix_maps <- NULL
-# static_mix_maps <- NULL
-
-# Shape files
-country_outline <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/country_shapefile.shp")
-state_outline   <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/state_shapefile_simp.shp")
-lga_outline     <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/lga_shapefile_simp.shp")
-state_outline$state[which(state_outline$state == "Akwa-Ibom")] <- "Akwa Ibom"
-
-# plan budget data
-national_budget <- NULL
-state_budget    <- NULL
-lga_budget      <- NULL
-
-# Extract unique plans and their descriptions
-unique_plans      <- NULL
-plan_descriptions <- NULL
-plan_labels       <- NULL
-
-# values to use as the year input selection values
-years_to_select <- NULL
-plans_to_select <- NULL
-
-# Extract unique plans and their descriptions, excluding 'baseline'
-unique_plans2 <- NULL
 

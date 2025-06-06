@@ -349,15 +349,15 @@ tab1aServer <- function(input, output, session,
   })
 
     # Scenario upload handler
-    observeEvent(input$submit_scenario, {
-      req(input$scenario_file, input$scenario_name)
-
+  observeEvent(input$submit_scenario, {
+    if (lite_mode) {
       showModal(modalDialog(
-        title = "Processing Scenario File",
-        "Reading Excel file sheets...",
-        footer = NULL,
+        title = "Feature Disabled",
+        "Scenario uploading is disabled in this demonstration version.",
         easyClose = TRUE
       ))
+      return()
+    }
 
       tryCatch({
         all_sheet_names <- excel_sheets(input$scenario_file$datapath)
@@ -539,14 +539,14 @@ tab1aServer <- function(input, output, session,
 
   # Cost upload
   observeEvent(input$submit_cost, {
-    req(input$cost_file, input$cost_name)
-
-    showModal(modalDialog(
-      title = "Processing Cost File",
-      "Reading Excel file...",
-      footer = NULL,
-      easyClose = TRUE
-    ))
+    if (lite_mode) {
+      showModal(modalDialog(
+        title = "Feature Disabled",
+        "Cost uploading is disabled in this demonstration version.",
+        easyClose = TRUE
+      ))
+      return()
+    }
 
     tryCatch({
       current_data <- read_excel(input$cost_file$datapath)
@@ -791,7 +791,16 @@ tab1aServer <- function(input, output, session,
 
 # Observe event delete data
 observeEvent(input$delete_scenario, {
-  req(input$delete_scenario)
+  if (lite_mode) {
+    showModal(modalDialog(
+      title = "Feature Disabled",
+      "Deleting scenarios is disabled in this demonstration version.",
+      easyClose = TRUE
+    ))
+    return()
+  }
+
+   req(input$delete_scenario)
 
   print(paste("Triggered delete for scenario ID:", input$delete_scenario))
 
@@ -834,6 +843,14 @@ observeEvent(input$delete_scenario, {
 # Delete Cost action
 observeEvent(input$delete_cost, {
   req(input$delete_cost)
+  if (lite_mode) {
+    showModal(modalDialog(
+      title = "Feature Disabled",
+      "Deleting cost sheets is disabled in this demonstration version.",
+      easyClose = TRUE
+    ))
+    return()
+  }
   cost_id <- input$delete_cost
 
   db <- dbConnect(SQLite(), "cost_uploads.db")

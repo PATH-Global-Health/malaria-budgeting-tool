@@ -22,6 +22,16 @@ tab1aUI <- function(id) {
     ),
 
     titlePanel("Data Download and Upload"),
+
+    div(
+      style = "background-color: #fff3cd; border-left: 6px solid #ffa500; padding: 15px; margin-bottom: 20px;",
+      strong("IMPORTANT: This is a demonstration version of the tool. "),
+      "Data uploading functionality has been suspended. The values and outputs presented here are illustrative only, intended to showcase the tool's features. They should not be used for any decision-making or extrapolation.
+      In addition, the data presented here is not representative of any real-world scenarios or costs.
+
+      Our tool is in active development and therefore the version presented here is meant to be illustrative of the types of functionality that we are building out. We still have many features in progress and can't wait to share in the near future. Please reach out to hthompson@path.org with any suggestions or feedback you may have too we'd love to gain any insights from our community!",
+    ),
+
     page_sidebar(
         sidebar = sidebar(
         width = "400px",
@@ -51,13 +61,13 @@ tab1aUI <- function(id) {
           downloadButton(ns("download_scenario_template"), "Download Empty Scenario Template"),
           uiOutput(ns("scenario_download_ui")),
           hr(),
-          fileInput(ns("scenario_file"), "Upload Scenario File",
-                   accept = c(".xlsx", ".xls")),
+          fileInput(ns("scenario_file"), "Upload Scenario File", accept = c(".xlsx", ".xls")) |>
+            tagAppendAttributes(disabled = lite_mode),
           textInput(ns("scenario_name"), "Scenario Name",
                    placeholder = "Give this scenario a name"),
           textAreaInput(ns("scenario_description"), "Description",
                        placeholder = "Add a description (optional)"),
-          actionButton(ns("submit_scenario"), "Submit Scenario", class = "btn-primary")
+          actionButton(ns("submit_scenario"), "Submit Scenario", class = "btn-primary", disabled = if (lite_mode) NA else NULL)
         ),
 
         # Cost Template Section
@@ -66,13 +76,13 @@ tab1aUI <- function(id) {
           downloadButton(ns("download_cost_template"), "Download Empty Cost Template"),
           uiOutput(ns("cost_download_ui")),
           hr(),
-          fileInput(ns("cost_file"), "Upload Cost File",
-                   accept = c(".xlsx", ".xls")),
+          fileInput(ns("cost_file"), "Upload Cost File", accept = c(".xlsx", ".xls")) |>
+            tagAppendAttributes(disabled = lite_mode),
           textInput(ns("cost_name"), "Cost Sheet Name",
                    placeholder = "Give this cost sheet a name"),
           textAreaInput(ns("cost_description"), "Description",
                        placeholder = "Add a description (optional)"),
-          actionButton(ns("submit_cost"), "Submit Cost Sheet", class = "btn-primary")
+          actionButton(ns("submit_cost"), "Submit Cost Sheet", class = "btn-primary", disabled = if (lite_mode) NA else NULL)
         )
       ),
 
