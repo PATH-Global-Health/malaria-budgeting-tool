@@ -1673,6 +1673,7 @@ generate_budget <- function(scen_data, cost_data){
 
 
   #-CASE MANAGEMENT-----------------------------------------------------------------
+  # Still using this data as need to discuss quantification methods with program
   case_management_quantification <-
     read.csv(
       "data/nga-demo-data-pre-processed/cm-quant-data.csv"
