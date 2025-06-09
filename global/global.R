@@ -164,6 +164,10 @@ target_population <-
 lite_mode <- TRUE
 
 
-
+# Shape files
+country_outline <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/country_shapefile.shp")
+state_outline   <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/state_shapefile_simp.shp")
+lga_outline     <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/lga_shapefile_simp.shp")
+state_outline$state[which(state_outline$state == "Akwa-Ibom")] <- "Akwa Ibom"
 
 

@@ -67,19 +67,19 @@ ui <- page_fluid(
   div(
     class = "sidebar-container",
     h3("DEMO Malaria Budget Comparison Tool"),
-    tags$a(
-      href = 'https://www.path.org/who-we-are/programs/malaria/malaria-control-and-elimination-partnership-in-africa-macepa/',
-      icon("house"),
-      title = "Go to PATH Malaria Page"
-    ),
-    br(),
-    actionLink("info", label = "", icon = icon("info"), title = "Info"),
-    br(),
-    tags$a(
-      href = "mailto:hthompson@path.org",
-      icon("comments"),
-      title = "Message Team"
-    ),
+    # tags$a(
+    #   href = 'https://www.path.org/who-we-are/programs/malaria/malaria-control-and-elimination-partnership-in-africa-macepa/',
+    #   icon("house"),
+    #   title = "Go to PATH Malaria Page"
+    # ),
+    # br(),
+    # actionLink("info", label = "", icon = icon("info"), title = "Info"),
+    # br(),
+    # tags$a(
+    #   href = "mailto:hthompson@path.org",
+    #   icon("comments"),
+    #   title = "Message Team"
+    # ),
     br(),
     br(),
     navset_pill_list(
