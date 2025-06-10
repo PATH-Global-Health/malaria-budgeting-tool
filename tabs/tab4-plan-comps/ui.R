@@ -45,9 +45,9 @@ tab4UI <- function(id) {
     br(),
     uiOutput(ns("page_description")),
     uiOutput(ns("maps_ui")),
-    uiOutput(ns("budget_comps")),
-    uiOutput(ns("budget_tables")),
-    uiOutput(ns("budget_tables_comp")),
-    uiOutput(ns("budget_item_plots"))
+    withSpinner(uiOutput(ns("budget_comps"))),
+    withSpinner(uiOutput(ns("budget_tables"))),
+    withSpinner(uiOutput(ns("budget_tables_comp"))),
+    withSpinner(uiOutput(ns("budget_item_plots")))
   )
 }

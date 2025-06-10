@@ -74,7 +74,7 @@ tab3UI <- function(id) {
     uiOutput(ns("maps_ui")),
 
     # Ribbon values
-    uiOutput(ns("value_boxes")),
+    withSpinner(uiOutput(ns("value_boxes"))),
 
     # Table summarising Elemental costs
     uiOutput(ns("budget_table_card")),

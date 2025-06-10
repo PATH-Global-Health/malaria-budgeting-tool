@@ -251,7 +251,7 @@ tab4Server <- function(input, output, session,
         style = "resize: vertical; overflow: auto; min-height: 300px; max-height: 800px;",
         card_body(
           class = "p-0",
-          uiOutput(session$ns("comparison_tabs"))
+          withSpinner(uiOutput(session$ns("comparison_tabs")))
         )
       )
     )
@@ -271,7 +271,7 @@ tab4Server <- function(input, output, session,
       safe_plan <- gsub(" ", "_", plan)  # sanitize for output ID
       tabPanel(
         title = plan,
-        leafletOutput(session$ns(paste0("comparison_map_", safe_plan)))
+        withSpinner(leafletOutput(session$ns(paste0("comparison_map_", safe_plan))))
       )
     }))
 
@@ -399,8 +399,8 @@ tab4Server <- function(input, output, session,
           min_height = 400,
           layout_column_wrap(
             width = 1/2,
-            plotlyOutput(session$ns("budget_comp_chart"), height = "100%"),
-            plotlyOutput(session$ns("budget_diff_chart"), height = "100%"),
+            withSpinner(plotlyOutput(session$ns("budget_comp_chart"), height = "100%")),
+            withSpinner(plotlyOutput(session$ns("budget_diff_chart"), height = "100%")),
 
           )
         )
@@ -445,7 +445,7 @@ tab4Server <- function(input, output, session,
         )
       ),
       card_body(
-        DT::dataTableOutput(session$ns("budget_table"))
+        withSpinner(DT::dataTableOutput(session$ns("budget_table")))
       )
     )
   })
@@ -481,7 +481,7 @@ tab4Server <- function(input, output, session,
           )
         ),
         card_body(
-          DT::dataTableOutput(session$ns(paste0("budget_table_comp_", safe_label)))
+          withSpinner(DT::dataTableOutput(session$ns(paste0("budget_table_comp_", safe_label))))
         )
       )
     })
@@ -575,7 +575,7 @@ tab4Server <- function(input, output, session,
         )
       ),
       card_body(
-        plotOutput(session$ns("final_cost_plot"), height = "600px")
+        withSpinner(plotOutput(session$ns("final_cost_plot"), height = "600px"))
       )
     )
   })

@@ -370,7 +370,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
       !!!lapply(c(years), function(y) {
         nav_panel(
           title = paste(y),
-          plotOutput(session$ns(paste0("static_map_", y)), height = "500px")
+          withSpinner(plotOutput(session$ns(paste0("static_map_", y)), height = "500px"))
         )
       })
     )
@@ -396,7 +396,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
         full_screen = TRUE,
         card_body(
           class = "p-0",
-          leafletOutput(session$ns("interactive_map"))
+          withSpinner(leafletOutput(session$ns("interactive_map")))
         )
       ),
 
@@ -454,7 +454,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
         )
         ),
       card_body(
-        DT::dataTableOutput(session$ns("budget_table"))
+        withSpinner(DT::dataTableOutput(session$ns("budget_table")))
       )
     )
   })
@@ -697,7 +697,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           card_title("Proportion of Total Budget by Item"),
           card_body(
             class = "p-0",
-            billboarderOutput(session$ns("donut_chart"))
+            withSpinner(billboarderOutput(session$ns("donut_chart")))
             )
 
         ),
@@ -706,7 +706,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           card_title("Treemap of Budget Items"),
           card_body(
             class = "p-0",
-            plotlyOutput(session$ns("treemap_chart"))
+            withSpinner(plotlyOutput(session$ns("treemap_chart")))
           )
 
         ),
@@ -734,7 +734,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           card_title("Cost Breakdown by Category per Intervention"),
           card_body(
             class = "p-0",
-            plotlyOutput(session$ns("stacked_barchart"))
+            withSpinner(plotlyOutput(session$ns("stacked_barchart")))
           )
         ),
         nav_panel(
@@ -742,7 +742,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           card_title("% Contribution by Category per Intervention"),
           card_body(
             class = "p-0",
-            plotlyOutput(session$ns("stacked_prop"))
+            withSpinner(plotlyOutput(session$ns("stacked_prop")))
           )
         ),
         nav_panel(
@@ -750,7 +750,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           card_title("Top 15 Specific Cost Components"),
           card_body(
             class = "p-0",
-            plotlyOutput(session$ns("lolipop_chart"))
+            withSpinner(plotlyOutput(session$ns("lolipop_chart")))
           )
 
         ),
@@ -778,7 +778,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           full_screen = TRUE,
           card_body(
             class = "p-0",
-            leafletOutput(session$ns("state_total_map"))
+            withSpinner(leafletOutput(session$ns("state_total_map")))
           )
 
         ),
@@ -788,7 +788,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           full_screen = TRUE,
           card_body(
             class = "p-0",
-            leafletOutput(session$ns("state_pp_map"))
+            withSpinner(leafletOutput(session$ns("state_pp_map")))
           )
         ),
         nav_panel(
@@ -797,7 +797,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           full_screen = TRUE,
           card_body(
             class = "p-0",
-            leafletOutput(session$ns("lga_total_map"))
+            withSpinner(leafletOutput(session$ns("lga_total_map")))
           )
 
         ),
@@ -807,7 +807,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
           full_screen = TRUE,
           card_body(
             class = "p-0",
-            leafletOutput(session$ns("lga_pp_map"))
+            withSpinner(leafletOutput(session$ns("lga_pp_map")))
           )
 
         ),
