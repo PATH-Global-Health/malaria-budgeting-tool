@@ -96,7 +96,7 @@ ui <- page_fluid(
     ),
     # Add logo at the bottom
     div(style = "position: absolute; bottom: 10px; width: 100%; text-align: center;",
-        img(src = "NMEP_logo.png", height = "60px", style = "margin-bottom: 10px;"),
+        # img(src = "NMEP_logo.png", height = "60px", style = "margin-bottom: 10px;"),
         img(src = "PATH_Logo_Color.png", height = "60px")
     )
   ),
