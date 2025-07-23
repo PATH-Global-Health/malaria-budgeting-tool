@@ -1,111 +1,158 @@
 tab1aUI <- function(id) {
-  ns <- NS(id)
+  ns <- NS(id) # Create namespace function for this module instance
+
   fluidPage(
+    useShinyjs(), # Load shinyjs for enabling/disabling or manipulating elements with JS
 
-    # Add the useShinyjs() function
-    useShinyjs(),
+    # ----------------------------------
+    # Custom JavaScript in the <head>
+    # for restting the scroll
+    # ----------------------------------
     tags$head(
-      # Keep your scroll-to-top function
       tags$script("
-    function resetScroll() {
-      window.scrollTo(0, 0);
-    }
-  "),
-
-      # Add this script to fix scroll freezing after modals
+        function resetScroll() {
+          window.scrollTo(0, 0); // Defines a JS function to scroll to top (can be called from R)
+        }
+      "),
       tags$script(HTML("
-    $(document).on('hidden.bs.modal', function () {
-      $('body').removeClass('modal-open');
-      $('body').css('overflow', 'auto');
-    });
+        // Ensures after closing a Bootstrap modal, scrollbars work correctly
+        $(document).on('hidden.bs.modal', function () {
+          $('body').removeClass('modal-open');
+          $('body').css('overflow', 'auto');
+        });
+      ")),
+      tags$style(HTML("
+      .card-header {
+      font-weight: bold;
+    }
   "))
     ),
 
-    titlePanel("Data Download and Upload"),
-
+    # -------------------------------
+    # Yellow warning banner
+    # -------------------------------
     div(
       style = "background-color: #fff3cd; border-left: 6px solid #ffa500; padding: 15px; margin-bottom: 20px;",
-      strong("IMPORTANT: This is a demonstration version of the tool. "),
-      "Our tool was initially developed for the Nigeria Context and we acknowledge their support in its development. Data uploading functionality has been suspended. The values and outputs presented here are illustrative only, intended to showcase the tool's features. They should not be used for any decision-making or extrapolation.
-      In addition, the data presented here is not representative of any real-world scenarios or costs.
-
-      Our tool is in active development and therefore the version presented here is meant to be illustrative of the types of functionality that we are building out. We still have many features in progress and can't wait to share in the near future. Please reach out to hthompson@path.org with any suggestions or feedback you may have too we'd love to gain any insights from our community!",
-
+      strong(head_bold),
+      main_text
     ),
+    actionButton(ns("show_instructions"), "📘 Instructions détaillées", class = "btn-info"),
 
-    page_sidebar(
+    # # -------------------------------
+    # # Instructions upfront
+    # # -------------------------------
+    # card(
+    #   card_header("Instructions"),
+    #   layout_column_wrap(
+    #     card(
+    #       card_header("Cet outil vous aide à gérer à la fois les modèles de scénario et les modèles de coûts:"),
+    #       card_body(
+    #         tags$ul(
+    #           tags$li("Modèles de scénario : plusieurs feuilles (par année) pour les plans d'intervention"),
+    #           tags$li("Modèles de coûts : une seule feuille pour les informations sur les coûts unitaires")
+    #         )
+    #       )
+    #     ),
+    #     card(
+    #       card_header("Pour commencer avec l'un ou l'autre modèle :"),
+    #       card_body(
+    #         tags$ul(
+    #           tags$li("Téléchargez un modèle vide pour créer un nouveau fichier, ou"),
+    #           tags$li("Téléchargez un fichier existant à partir des tableaux ci-dessous")
+    #         )
+    #       )
+    #     )
+    #   ),
+    #
+    # ),
+
+    # -------------------------------
+    # Scenario Template Section
+    # -------------------------------
+    card(
+      # global card header
+      card_header("Modèle de scénario"),
+      # sidebar layout with sidebar and card body
+      layout_sidebar(
+
+        # add the sidebar with input elements
         sidebar = sidebar(
-        width = "400px",
-        card(
-          "Instructions",
-          p("This tool helps you manage both Scenario and Cost templates:"),
-          tags$ul(
-            tags$li("Scenario templates: Multiple sheets (by year) for intervention plans"),
-            tags$li("Cost templates: Single sheet for unit cost information")
+          width = "400px",
+
+          # Select the years of the plan
+          selectInput(ns("year_filter"), "Sélectionnez les années d'intérêt :",
+            choices = DEFAULT_YEARS,
+            selected = 2025:2027,
+            multiple = TRUE
           ),
-          p("To get started with either template:"),
-          tags$ul(
-            tags$li("Download an empty template to create a new file, or"),
-            tags$li("Download an existing file from the tables below")
-          )
-        ),
-
-        actionButton(ns("show_instructions"), "📘 Detailed Instructions", class = "btn-info"),
-
-        # Scenario Template Section
-        card(
-          "Scenario Template",
-          selectInput(ns("year_filter"), "Select years of interest:",
-                     choices = DEFAULT_YEARS,
-                     selected = 2025:2027,
-                     multiple = TRUE),
-          downloadButton(ns("download_scenario_template"), "Download Empty Scenario Template"),
+          # Download the scenario template
+          downloadButton(ns("download_scenario_template"), "Télécharger le modèle de scénario vide", class = "btn-primary"),
           uiOutput(ns("scenario_download_ui")),
           hr(),
-          fileInput(ns("scenario_file"), "Upload Scenario File", accept = c(".xlsx", ".xls")) |>
+          fileInput(ns("scenario_file"), "Importer un fichier de scénario", accept = c(".xlsx", ".xls")) |>
             tagAppendAttributes(disabled = lite_mode),
-          textInput(ns("scenario_name"), "Scenario Name",
-                   placeholder = "Give this scenario a name"),
+          textInput(ns("scenario_name"), "Nom du scénario",
+            placeholder = "Donnez un nom à ce scénario"
+          ),
           textAreaInput(ns("scenario_description"), "Description",
-                       placeholder = "Add a description (optional)"),
-          actionButton(ns("submit_scenario"), "Submit Scenario", class = "btn-primary", disabled = if (lite_mode) NA else NULL)
+            placeholder = "Ajoutez une description (facultatif)"
+          ),
+          actionButton(ns("submit_scenario"), "Soumettre le scénario", class = "btn-primary", disabled = if (lite_mode) NA else NULL)
         ),
 
-        # Cost Template Section
+        # include the card body with the plots
         card(
-          "Cost Template",
-          downloadButton(ns("download_cost_template"), "Download Empty Cost Template"),
-          uiOutput(ns("cost_download_ui")),
-          hr(),
-          fileInput(ns("cost_file"), "Upload Cost File", accept = c(".xlsx", ".xls")) |>
-            tagAppendAttributes(disabled = lite_mode),
-          textInput(ns("cost_name"), "Cost Sheet Name",
-                   placeholder = "Give this cost sheet a name"),
-          textAreaInput(ns("cost_description"), "Description",
-                       placeholder = "Add a description (optional)"),
-          actionButton(ns("submit_cost"), "Submit Cost Sheet", class = "btn-primary", disabled = if (lite_mode) NA else NULL)
+          card_header("Importations de scénarios précédents"),
+          card_body(DTOutput(ns("scenario_uploads_table")))
         )
-      ),
-
-      # Main panel content - stacked layout
-      card(
-        card_header("Previous Scenario Uploads"),
-        DTOutput(ns("scenario_uploads_table"))
-
-      ),
-      card(
-        card_header("Previous Cost Uploads"),
-        DTOutput(ns("cost_uploads_table"))
       )
     ),
 
-    # Add JavaScript for delete confirmation
+
+    # -------------------------------
+    # Cost Template Section
+    # -------------------------------
+    card(
+      # global card header
+      card_header("Modèle de coûts"),
+      # sidebar layout with sidebar and card body
+      layout_sidebar(
+
+        # add the sidebar with input elements
+        sidebar = sidebar(
+          width = "400px",
+          downloadButton(ns("download_cost_template"), "Télécharger le modèle de coûts vide", class = "btn-primary", ),
+          uiOutput(ns("cost_download_ui")),
+          hr(),
+          fileInput(ns("cost_file"), "Importer un fichier de coûts", accept = c(".xlsx", ".xls")) |>
+            tagAppendAttributes(disabled = lite_mode),
+          textInput(ns("cost_name"), "Nom de la feuille de coûts",
+            placeholder = "Donnez un nom à cette feuille de coûts"
+          ),
+          textAreaInput(ns("cost_description"), "Description",
+            placeholder = "Ajoutez une description (facultatif)"
+          ),
+          actionButton(ns("submit_cost"), "Soumettre la feuille de coûts", class = "btn-primary", disabled = if (lite_mode) NA else NULL)
+        ),
+
+        # include the card body with the plots
+        card(
+          card_header("Importations de coûts précédentes"),
+          DTOutput(ns("cost_uploads_table"))
+        )
+      )
+    ),
+
+    # -------------------------------
+    # JavaScript for deleting scenarios
+    # -------------------------------
     tags$script(HTML("
-    function deleteScenario(id) {
-      if (confirm('Are you sure you want to permanently delete this scenario?')) {
-        Shiny.setInputValue('delete_scenario', id);
+      function deleteScenario(id) {
+        if (confirm('Êtes-vous sûr de vouloir supprimer définitivement ce scénario ?')) {
+          Shiny.setInputValue('delete_scenario', id);
+          // Sends value back to server in input$delete_scenario
+        }
       }
-    }
-  "))
+    "))
   )
 }

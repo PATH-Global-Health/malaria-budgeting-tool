@@ -11,19 +11,19 @@ tab5Server <- function(input, output, session, shared) {
   output$plan_ui <- renderUI({
     req(budget_data())
     choices <- sort(unique(budget_data()$source_scenario))
-    selectInput(ns("plan_select"), "Select Plan(s)", choices = choices, multiple = TRUE)
+    selectInput(ns("plan_select"), "Sélectionnez le(s) plan(s)", choices = choices, multiple = TRUE)
   })
 
   output$year_ui <- renderUI({
     req(budget_data())
     choices <- sort(unique(budget_data()$year))
-    selectInput(ns("year_select"), "Select Year", choices = c(choices))
+    selectInput(ns("year_select"), "Sélectionnez l'année", choices = c(choices))
   })
 
   output$currency_ui <- renderUI({
     req(budget_data())
     choices <- sort(unique(budget_data()$currency))
-    selectInput(ns("currency_select"), "Select Currency", choices = choices)
+    selectInput(ns("currency_select"), "Sélectionnez la devise", choices = choices)
   })
 
   # -- Enable/disable buttons based on input validation --
@@ -81,7 +81,7 @@ tab5Server <- function(input, output, session, shared) {
       paste0("figures-", paste(input$plan_select, collapse = "_"), "-", Sys.Date(), ".zip")
     },
     content = function(file) {
-      withProgress(message = 'Generating Figures', value = 0, {
+      withProgress(message = "Generating Figures", value = 0, {
         incProgress(0.1)
         tmp_dir <- tempfile("figures")
         dir.create(tmp_dir)

@@ -30,11 +30,17 @@ library(purrr)
 library(shinycssloaders)
 # library(openxlsx2)
 
+
+# Warning message for demo tool
+head_bold <- "IMPORTANT : Ceci est une version de démonstration de l’outil."
+main_text <- "Les valeurs et les résultats présentés ici sont donnés à titre indicatif uniquement et visent à présenter les fonctionnalités de l'outil. Ils ne doivent pas servir à la prise de décision ni à l'extrapolation. De plus, les données présentées ici ne sont représentatives d'aucun scénario ni coût réel. Notre outil est en cours de développement; la version présentée ici est donc destinée à illustrer les fonctionnalités que nous développons. De nombreuses fonctionnalités sont encore en développement et nous avons hâte de les partager prochainement. N'hésitez pas à nous contacter à hthompson@path.org pour toute suggestion ou commentaire; nous serions ravis de recueillir les avis de notre communauté!"
+
+
 #-read in usable data-----------------------------------------------------------
 
 # Read template file and store column names and admin data
-template_file_path <- "www/scenario-template.xlsx"
-cost_template_file_path <- "www/cost-template.xlsx"
+template_file_path <- "www/scenario-template-empty_Francais.xlsx"
+cost_template_file_path <- "www/cost-template-empty_Francais.xlsx"
 
 SCENARIO_COLS <- colnames(read_excel(template_file_path))
 COST_COLS <- colnames(read_excel(cost_template_file_path))
@@ -50,7 +56,7 @@ get_template_admin_data <- function() {
 TEMPLATE_ADMIN_DATA <- get_template_admin_data()
 
 # Default years range (2020-2030)
-DEFAULT_YEARS <- as.character(2025:2032)
+DEFAULT_YEARS <- as.character(2026:2032)
 
 # Function to sync database with actual files
 sync_database <- function(type = "scenario") {
@@ -65,7 +71,7 @@ sync_database <- function(type = "scenario") {
   db <- dbConnect(SQLite(), db_file)
 
   # Create table if it doesn't exist
-  if(type == "scenario") {
+  if (type == "scenario") {
     dbExecute(db, "
       CREATE TABLE IF NOT EXISTS uploads (
         id TEXT PRIMARY KEY,
@@ -98,10 +104,12 @@ sync_database <- function(type = "scenario") {
 
   # Remove records for files that no longer exist
   missing_files <- setdiff(db_files, existing_files)
-  if(length(missing_files) > 0) {
+  if (length(missing_files) > 0) {
     placeholders <- paste(rep("?", length(missing_files)), collapse = ",")
-    dbExecute(db, sprintf("DELETE FROM uploads WHERE filename IN (%s)", placeholders),
-             missing_files)
+    dbExecute(
+      db, sprintf("DELETE FROM uploads WHERE filename IN (%s)", placeholders),
+      missing_files
+    )
   }
 
   dbDisconnect(db)
@@ -109,8 +117,8 @@ sync_database <- function(type = "scenario") {
 
 # Add this to your global.R or run it once to set up the database
 if (!file.exists("scenario_uploads.db")) {
-       db <- dbConnect(SQLite(), "scenario_uploads.db")
-       dbExecute(db, "
+  db <- dbConnect(SQLite(), "scenario_uploads.db")
+  dbExecute(db, "
          CREATE TABLE uploads (
            id TEXT PRIMARY KEY,
            name TEXT,
@@ -121,8 +129,8 @@ if (!file.exists("scenario_uploads.db")) {
            upload_date DATETIME DEFAULT CURRENT_TIMESTAMP
          )
        ")
-       dbDisconnect(db)
-     }
+  dbDisconnect(db)
+}
 
 # Create necessary directories
 dir.create("uploads", showWarnings = FALSE)
@@ -146,7 +154,7 @@ read_sheets_with_year <- function(file_path) {
 
   map_dfr(sheet_names, function(sheet) {
     read_excel(file_path, sheet = sheet) %>%
-      mutate(year = as.numeric(sheet))  # assumes the sheet name is the year
+      mutate(year = as.numeric(sheet)) # assumes the sheet name is the year
   })
 }
 
@@ -155,19 +163,28 @@ scenario_data <- map_dfr(scenario_files, read_sheets_with_year)
 
 target_population <-
   readxl::read_xlsx(
-    "data/nga-demo-data-pre-processed/data-needs-not-user-defined.xlsx",
+    "www/data-needs-not-user-defined-empty_Francais.xlsx",
     sheet = "population"
   )
 
 
 # define app as lite mode to suspend upload and delete ability
-lite_mode <- TRUE
-
+lite_mode <- FALSE
 
 # Shape files
-country_outline <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/country_shapefile.shp")
-state_outline   <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/state_shapefile_simp.shp")
-lga_outline     <- sf::st_read("data/nga-demo-data-pre-processed/shapefiles/lga_shapefile_simp.shp")
-state_outline$state[which(state_outline$state == "Akwa-Ibom")] <- "Akwa Ibom"
+# country_outline <- NULL
+# adm1_outline <- sf::st_read("data/shapefiles/drc-admin1-clean-id.shp") |>
+#   select(adm1 = province, geometry) |>
+#   st_simplify(dTolerance = 2000, preserveTopology = TRUE)
+#
+# adm2_outline <- sf::st_read("data/shapefiles/drc-admin2-clean-id.shp") |>
+#   select(adm1 = provinc, adm2 = hlth_zn, geometry) |>
+#   st_simplify(dTolerance = 2000, preserveTopology = TRUE)
 
+# plot(adm2_outline)
 
+# st_write(adm1_outline, "data/shapefiles/drc-admin1-clean-id-simp.shp")
+# st_write(adm2_outline, "data/shapefiles/drc-admin2-clean-id-simp.shp")
+
+adm1_outline <- sf::st_read("data/shapefiles/drc-admin1-clean-id-simp.shp")
+adm2_outline <- sf::st_read("data/shapefiles/drc-admin2-clean-id-simp.shp")

@@ -1,69 +1,228 @@
 tab2aServer <- function(input, output, session, shared) {
   ns <- session$ns
-  row_count <- reactiveVal(3)
 
-  # Store matrix selections
-  matrix_selections <- reactiveVal(NULL)
+  # # ----------------------------------------------------------------------------
+  # # SAFELY INITIALIZE SHARED REFRESH TRIGGER
+  # # ----------------------------------------------------------------------------
+  # if (is.null(isolate(shared$refresh_trigger))) {
+  #   shared$refresh_trigger <- reactiveVal(0)
+  # }
 
-  # Store budget results
-  budget_results <- reactiveVal(NULL)
+  # ----------------------------------------------------------------------------
+  # INSTRUCTIONS POP UP
+  # ----------------------------------------------------------------------------
+  observeEvent(input$show_instructions, {
+    showModal(modalDialog(
+      title = "Instructions détaillées pour Générer des budgets",
+      easyClose = TRUE,
+      size = "l",
+      footer = modalButton("Fermer"),
+      tagList(
+        p("Cette section permet aux utilisateurs de générer des budgets d'intervention complets en combinant des plans précédemment téléchargés avec une feuille de coûts sélectionnée. L'outil calcule les budgets totaux en fonction de la combinaison d'interventions sélectionnée, de la population cible et des hypothèses budgétaires définies pour chaque intervention."),
+        tags$b("Étapes d'utilisation :"),
+        tags$ol(
+          tags$li("📝 Sélectionnez un ou plusieurs plans d’intervention dans la liste déroulante."),
+          tags$li("💵 Sélectionnez une feuille de coûts dans la liste déroulante."),
+          tags$li("📐 Sélectionnez les hypothèses de quantification budgétaire pour chaque intervention."),
+          tags$li("Sélectionnez l’hypothèse de tampon d’approvisionnement à utiliser."),
+          tags$li("⚠️ Vérifiez et confirmez vos sélections. Dans le cas contraire, l'outil signalera les données manquantes."),
+          tags$li("⚙️ Cliquez sur le bouton « Générer des budgets »."),
+          tags$li("⏳ Attendez le message de confirmation. Les données budgétaires générées apparaîtront sous les onglets « Visualisation du plan » et « Comparaison du plan ».")
+        ),
+        p("📝 Conseil : Assurez-vous que votre feuille de coûts inclut les valeurs pour tous les types et sous-types d’intervention prévus pour une utilisation (par exemple, PBO par rapport aux moustiquaires standard, RTSS par rapport aux vaccins R21).")
+      )
+    ))
+  })
 
-  # Budget generation status
-  budget_generating <- reactiveVal(FALSE)
+  # ----------------------------------------------------------------------------
+  # BUDGET ASSUMPTIONS POP UP
+  # ----------------------------------------------------------------------------
+  observeEvent(input$show_assumptions, {
+    showModal(modalDialog(
+      title = "Informations détaillées sur les hypothèses clés pour l'élaboration du budget",
+      easyClose = TRUE,
+      size = "l",
+      footer = modalButton("Fermer"),
+      tagList(
+        p("Voici les principaux paramètres et hypothèses utilisés pour générer les budgets dans cet outil. Pour les ajuster, sélectionnez l'option « Ajuster » dans la liste déroulante « Hypothèses » de la matrice de sélection."),
+        accordion(
+          open = FALSE,
+          accordion_panel(
+            title = "Campagne MII",
+            open = FALSE,
+            tagList(
+              tags$ul(
+                tags$li("Personnes par MII : 1,8"),
+                tags$li("Population cible : population totale"),
+                tags$li("Couverture : 100 % de la population cible"),
+                tags$li("MII par balle : 50"),
+                tags$li("Tampon d'approvisionnement : 10%")
+              )
+            )
+          ),
+          accordion_panel(
+            title = "Routine MII",
+            open = FALSE,
+            tagList(
+              tags$ul(
+                tags$li("Population cible : enfants de moins de 5 ans et femmes enceintes"),
+                tags$li("Couverture : 30 % de la population cible"),
+                tags$li("Tampon d'approvisionnement : 10%")
+              )
+            )
+          ),
+          accordion_panel(
+            title = "TPIp",
+            open = FALSE,
+            tagList(
+              tags$ul(
+                tags$li("Population cible : femmes enceintes"),
+                tags$li("Couverture : 80 % de participation à l'ANC"),
+                tags$li("Points de contact : 3 par femme enceinte"),
+                tags$li("Tampon d'approvisionnement : 10%")
+              )
+            )
+          ),
+          accordion_panel(
+            title = "CPS",
+            open = FALSE,
+            tagList(
+              tags$ul(
+                tags$li("Population cible : enfants de 3 mois à 5 ans"),
+                tags$li("Cycles : 4 cycles mensuels"),
+                tags$li("Couverture : 100 % de la population cible"),
+                tags$li("Répartition par âge : 18 % 3-11 mois, 77 % 12-59 mois"),
+                tags$li("Tampon d'approvisionnement : 10%")
+              )
+            )
+          ),
+          accordion_panel(
+            title = "CPP",
+            open = FALSE,
+            tagList(
+              tags$ul(
+                tags$li("Population cible : enfants de 0 à 2 ans"),
+                tags$li("Couverture : 85 % grâce aux visites de vaccination"),
+                tags$li("Points de contact : 4 par an"),
+                tags$li("Facteur d'échelle nutritionnelle : 75 %"),
+                tags$li("Tampon d'approvisionnement : 10%")
+              )
+            )
+          ),
+          accordion_panel(
+            title = "Vaccin",
+            open = FALSE,
+            tagList(
+              tags$ul(
+                tags$li("Population cible : enfants de 5 mois à 36 mois"),
+                tags$li("Couverture : 84 %"),
+                tags$li("Doses : 4 doses par enfant"),
+                tags$li("Tampon d'approvisionnement : 10%")
+              )
+            )
+          ),
+          accordion_panel(
+            title = "Pulvérisation Intracommunautaire",
+            open = FALSE,
+            tagList(
+              tags$ul(
+                tags$li("Non quantifié actuellement dans cette version de l’outil — nécessite une consultation du programme.")
+              )
+            )
+          ),
+          accordion_panel(
+            title = "Prise en charge public",
+            open = FALSE,
+            tagList(
+              tags$ul(
+                tags$li("Non quantifié actuellement dans cette version de l’outil — nécessite une consultation du programme.")
+              )
+            )
+          )
+        ),
+        p(tags$em("Remarque : Toutes les hypothèses sont actuellement appliquées uniformément à toutes les zones géographiques. Des hypothèses propres à chaque province ou zone sanitaire pourront être intégrées dans les mises à jour futures.")),
+        p(tags$em("Consultez l’onglet Méthodes pour une description complète des calculs et des hypothèses pour chaque intervention."))
+      )
+    ))
+  })
 
-  # Budget history table
-  budget_history <- reactiveVal(data.frame(
-    date_generated = character(),
-    num_budgets = integer(),
-    scenario_cost_combinations = character(),
-    years_generated = character(),
-    file_path = character(),
-    stringsAsFactors = FALSE
-  ))
-  # On startup, load budget history if it exists
-  observe({
-    # Ensure the generated directory exists
-    if (!dir.exists("generated")) {
-      dir.create("generated", showWarnings = FALSE)
+  # ----------------------------------------------------------------------------
+  # NULL OPERATOR AND SAFE ACCESSOR
+  # ----------------------------------------------------------------------------
+  `%||%` <- function(a, b) if (!is.null(a)) a else b
+  get_safe <- function(lst, i) {
+    if (is.null(lst)) {
+      return(NULL)
     }
+    if (length(lst) >= i) lst[[i]] else NULL
+  }
 
-    history_path <- "generated/budget_history.rds"
-    if (file.exists(history_path)) {
-      budget_history(readRDS(history_path))
-    }
-  }, priority = 1000)
-
-
-  # Store selected values across UI redraws
-  stored_selections <- reactiveVal(list(
+  # ----------------------------------------------------------------------------
+  # INITIAL REACTIVE VALUES
+  # ----------------------------------------------------------------------------
+  row_count <- reactiveVal(1) # matrix row selections
+  stored_selections <- reactiveVal(list( # Store selected values across UI redraws
     plans = list(),
     costs = list(),
-    populations = list()
+    assumptions = list(),
+    adjustments = list()
+  ))
+  matrix_selections <- reactiveVal(NULL) # Store matrix selections
+  budget_results <- reactiveVal(NULL) # Store budget results
+  budget_generating <- reactiveVal(FALSE) # Budget generation status
+  incomplete_rows <- reactiveVal(integer(0)) # check if incomplete rows are trying to be processed
+
+  # ----------------------------------------------------------------------------
+  # BUDGET HISTORY
+  # ----------------------------------------------------------------------------
+  budget_history <- reactiveVal(data.frame( # Budget history table
+    date_generated = character(), # Date/time budget was generated
+    scenario = character(), # Scenario name
+    cost = character(), # Cost name
+    years = character(), # Years covered
+    assumption_type = character(), # "baseline", "custom", or "none"
+    assumptions_changes = character(), # Semicolon-separated changes or "Default"
+    file_path = character(), # Path to the saved RDS file
+    stringsAsFactors = FALSE
   ))
 
-  observeEvent(shared$refresh_trigger, {
-    message("🔄 Refreshing data in tab2a...")
-    shared$reload_all_uploads()
-  }, ignoreInit = FALSE)
+  observe({
+    if (!dir.exists("generated")) dir.create("generated", showWarnings = FALSE) # On startup, load budget history if it exists
+    history_path <- "generated/budget_history.rds"
+    if (file.exists(history_path)) {
+      history <- tryCatch(readRDS(history_path), error = function(e) NULL)
+      if (!is.null(history)) budget_history(history)
+    }
+  })
 
+  # ----------------------------------------------------------------------------
+  # REFRESH DATA WHEN SHARED REFRESH TRIGGER FIRES
+  # ----------------------------------------------------------------------------
+  observeEvent(shared$refresh_trigger,
+    {
+      message("🔄 Refreshing data in tab2a...")
+      shared$reload_all_uploads()
+    },
+    ignoreInit = FALSE
+  )
+
+  # ----------------------------------------------------------------------------
+  # REACTIVE UPLOAD DATA SOURCES
+  # ----------------------------------------------------------------------------
   scenario_data <- reactive({
     cache <- shared$scenario_uploads_cache
-    if (is.null(cache) || !is.reactive(cache)) return(NULL)
+    if (is.null(cache) || !is.reactive(cache)) {
+      return(NULL)
+    }
     cache()
   })
 
   cost_data <- reactive({
     cache <- shared$cost_upload_cache
-    if (is.null(cache) || !is.reactive(cache)) return(NULL)
+    if (is.null(cache) || !is.reactive(cache)) {
+      return(NULL)
+    }
     cache()
-  })
-
-  observe({
-    req(cost_data())
-    message("💵 Cost data column names:")
-    print(colnames(cost_data()))
-    message("📋 Head of cost data:")
-    print(head(cost_data()))
   })
 
   data_available <- reactive({
@@ -71,521 +230,650 @@ tab2aServer <- function(input, output, session, shared) {
       !is.null(cost_data()) && nrow(cost_data()) > 0
   })
 
-  # Reactive for cost titles to ensure they're only calculated once per render
-  cost_titles_reactive <- reactive({
-    req(cost_data())
-    cost_data() %>%
-      distinct(cost_name, cost_description) %>%
-      mutate(label = paste0(cost_name, " (", cost_description, ")"))
-  })
-
-  # Observe and store all input changes for persistence
-  observe({
-    req(cost_data(), row_count() > 0)
-
-    current_stored <- stored_selections()
-
-    # Store plan selections
-    for (i in 1:row_count()) {
-      plan_id <- paste0("row_option_", i)
-      if (!is.null(input[[plan_id]])) {
-        current_stored$plans[[i]] <- input[[plan_id]]
-      }
-
-      # Store target population selections
-      pop_id <- paste0("target_pop_", i)
-      if (!is.null(input[[pop_id]])) {
-        current_stored$populations[[i]] <- input[[pop_id]]
-      }
-
-      # Store cost checkbox selections
-      cost_selection <- NULL
-      if (!is.null(cost_titles_reactive())) {
-        for (j in 1:nrow(cost_titles_reactive())) {
-          checkbox_id <- paste0("cell_", i, "_", j)
-          if (!is.null(input[[checkbox_id]]) && input[[checkbox_id]]) {
-            cost_selection <- j
-
-            # Ensure only one cost option is selected per row
-            for (k in 1:nrow(cost_titles_reactive())) {
-              if (k != j) {
-                other_id <- paste0("cell_", i, "_", k)
-                if (!is.null(input[[other_id]]) && input[[other_id]]) {
-                  updateCheckboxInput(session, other_id, value = FALSE)
-                }
-              }
-            }
-          }
-        }
-      }
-      current_stored$costs[[i]] <- cost_selection
-    }
-
-    stored_selections(current_stored)
-  })
-
+  # ----------------------------------------------------------------------------
+  # MATRIX UI
+  # ----------------------------------------------------------------------------
   output$matrix_ui <- renderUI({
-    # First check if data is available
+    req(stored_selections())
     if (!data_available()) {
       return(
         div(
           style = "padding: 1em; color: #b30000;",
-          tags$h5("⚠️ No cost/Plan data uploaded"),
-          tags$p("Return to the User Input tab to specify this.")
+          tags$h5("⚠️ Données téléchargées sans frais/forfait"),
+          tags$p("Revenez à l’onglet Saisie utilisateur pour spécifier cela.")
         )
       )
     }
 
-    # Make sure we have all necessary data before proceeding
     req(cost_data(), scenario_data(), row_count())
-
-    # Get number of rows and cost data safely
     num_rows <- row_count()
-    if (num_rows <= 0) num_rows <- 1  # Safety check
+    if (num_rows <= 0) num_rows <- 1
 
-    # Safely get cost titles
-    cost_titles_df <- tryCatch({
-      cost_titles_reactive()
-    }, error = function(e) {
-      message("Error getting cost titles: ", e$message)
-      return(data.frame(cost_name = character(0),
-                        cost_description = character(0),
-                        label = character(0)))
-    })
+    plan_choices <- c("Sélectionnez un plan", unique(scenario_data()$scenario_name))
+    cost_choices <- c("Sélectionnez les coûts", unique(cost_data()$cost_name))
 
-    # Safety check for cost titles
-    if (nrow(cost_titles_df) == 0) {
-      return(
-        div(
-          style = "padding: 1em; color: #b30000;",
-          tags$h5("⚠️ No cost data available"),
-          tags$p("Cost data appears to be empty. Please check your data files.")
-        )
-      )
-    }
+    assumption_vars <- c(
+      "Campagne MII : personnes par moustiquaire",
+      "Campagne MII : population cible",
+      "Campagne MII : couverture de la population cible",
+      "Campagne MII : moustiquaires par balle",
+      "Campagne MII : marge de moustiquaires (%)",
+      "Routine MII : population cible",
+      "Routine MII : couverture de la population cible",
+      "Routine MII : marge de moustiquaires (%)",
+      "TPIp : fréquentation CPN",
+      "TPIp : points de contact",
+      "TPIp : marge pour l’approvisionnement en médicaments",
+      "CPS : population cible",
+      "CPS : couverture de la population cible",
+      "CPS : cycles",
+      "CPS : ciblage par âge",
+      "CPS : marge pour l’approvisionnement en médicaments",
+      "CPP : couverture",
+      "CPP : points de contact",
+      "CPP : facteur de mise à l’échelle nutritionnelle",
+      "CPP : marge pour l’approvisionnement en médicaments",
+      "Vaccination : couverture",
+      "Vaccination : nombre de doses",
+      "Vaccination : marge pour l’approvisionnement"
+    )
 
-    cost_titles <- cost_titles_df$label
+    assumption_choices <- c("Sélectionnez une hypothèse", "Accepter la base de référence", "Faire des ajustements")
 
-    # Safely get plan choices
-    plan_choices <- tryCatch({
-      c("Select a plan", unique(scenario_data()$scenario_name))
-    }, error = function(e) {
-      message("Error getting plan choices: ", e$message)
-      return(c("Select a plan"))
-    })
-
-    # Get stored selections
     stored <- stored_selections()
 
-    # Generate matrix inputs with safety checks
-    matrix_inputs <- lapply(1:num_rows, function(i) {
-      # Safely get stored plan
-      selected_plan <- "Select a plan"
-      if (!is.null(stored) && !is.null(stored$plans) && length(stored$plans) >= i) {
-        if (!is.null(stored$plans[[i]])) {
-          selected_plan <- stored$plans[[i]]
-          # Make sure selected plan is in choices
-          if (!selected_plan %in% plan_choices) {
-            selected_plan <- "Select a plan"
-          }
-        }
+    table_header <- div(
+      style = "display: table-row; font-weight: bold; background: #eaeaea;",
+      div(style = "display: table-cell; width:8%;  border:1px solid #ccc; padding:5px;", "Spécification"),
+      div(style = "display: table-cell; width:15%; border:1px solid #ccc; padding:5px;", "Plan"),
+      div(style = "display: table-cell; width:12%; border:1px solid #ccc; padding:5px;", "Coûts"),
+      div(style = "display: table-cell; width:15%; border:1px solid #ccc; padding:5px;", "Hypothèses"),
+      div(style = "display: table-cell; width:25%; border:1px solid #ccc; padding:5px;", "Ajustements"),
+      div(style = "display: table-cell; width:25%; border:1px solid #ccc; padding:5px;", "Résumé ajustements")
+    )
+
+    table_rows <- lapply(1:num_rows, function(i) {
+      is_invalid <- i %in% incomplete_rows()
+      row_style <- if (is_invalid) {
+        "display: table-row; background-color: #ffe6e6;" # light red
+      } else {
+        "display: table-row;"
       }
+      selected_plan <- get_safe(stored$plans, i) %||% "Sélectionnez un plan"
+      selected_cost <- get_safe(stored$costs, i) %||% "Sélectionnez les coûts"
+      selected_assumption <- get_safe(stored$assumptions, i) %||% "Sélectionnez une hypothèse"
 
-      row_dropdown <- selectInput(
-        inputId = ns(paste0("row_option_", i)),
-        label = NULL,
-        choices = plan_choices,
-        selected = selected_plan,
-        width = "100%"
-      )
 
-      # Generate cost checkbox inputs with safety checks
-      col_inputs <- lapply(seq_along(cost_titles), function(j) {
-        # Default to unchecked
-        is_checked <- FALSE
-
-        # Safely check if this should be checked based on stored values
-        if (!is.null(stored) && !is.null(stored$costs) && length(stored$costs) >= i) {
-          if (!is.null(stored$costs[[i]]) && stored$costs[[i]] == j) {
-            is_checked <- TRUE
-          }
-        }
-
-        checkboxInput(ns(paste0("cell_", i, "_", j)), label = NULL, value = is_checked)
-      })
-
-      # Safely get stored population
-      selected_pop <- "Whole population"
-      if (!is.null(stored) && !is.null(stored$populations) && length(stored$populations) >= i) {
-        if (!is.null(stored$populations[[i]])) {
-          selected_pop <- stored$populations[[i]]
-        }
-      }
-
-      population_dropdown <- selectInput(
-        inputId = ns(paste0("target_pop_", i)),
-        label = NULL,
-        choices = c("Whole population", "Children u5", "Children u10", "Children u5 + Pregnant Women"),
-        selected = selected_pop,
-        width = "100%"
-      )
-
-      # Return the row UI with safety check for cost titles length
-      tryCatch({
-        tagList(
-          div(
-            style = "display: flex; align-items: center; margin-bottom: 10px;",
-            div(style = "width: 150px;", row_dropdown),
-            div(
-              style = paste0("flex: 1; display: grid; grid-template-columns: repeat(", length(cost_titles) + 1, ", 1fr); gap: 10px;"),
-              tagList(
-                lapply(col_inputs, function(input) div(style = "text-align: center;", input)),
-                div(style = "min-width: 180px;", population_dropdown)
-              )
+      div(style = row_style, list(
+        div(
+          style = "display: table-cell; width:8%; border:1px solid #ccc; padding:5px; font-weight:bold;",
+          tagList(
+            HTML(paste0("Budget ", i, if (is_invalid) " ⚠️")),
+            actionLink(
+              ns(paste0("clear_row_", i)),
+              icon("broom", style = "color: #888;"), # light grey
+              style = "margin-left: 8px;",
+              title = "Réinitialiser cette ligne"
             )
           )
-        )
-      }, error = function(e) {
-        message("Error generating row UI: ", e$message)
-        # Return a simpler UI if there's an error
+        ),
         div(
-          style = "display: flex; align-items: center; margin-bottom: 10px;",
-          div(style = "width: 150px;", row_dropdown),
-          div(style = "color: red;", "Error rendering cost options"),
-          div(style = "min-width: 180px;", population_dropdown)
+          style = "display: table-cell; width:15%; border:1px solid #ccc; padding:5px;",
+          selectInput(ns(paste0("row_plan_", i)), NULL, plan_choices, selected_plan, width = "100%")
+        ),
+        div(
+          style = "display: table-cell; width:12%; border:1px solid #ccc; padding:5px;",
+          selectInput(ns(paste0("row_cost_", i)), NULL, cost_choices, selected_cost, width = "100%")
+        ),
+        div(
+          style = "display: table-cell; width:15%; border:1px solid #ccc; padding:5px;",
+          selectInput(ns(paste0("row_assumption_", i)), NULL, assumption_choices, selected_assumption, width = "100%")
+        ),
+        div(
+          style = "display: table-cell; width:25%; border:1px solid #ccc; padding:5px;",
+          conditionalPanel(
+            condition = sprintf("input['%s'] == 'Faire des ajustements'", ns(paste0("row_assumption_", i))),
+            tagList(
+              selectInput(ns(paste0("row_param_", i)), "Paramètre à ajuster", assumption_vars, width = "100%"),
+              uiOutput(ns(paste0("dynamic_input_", i))),
+              actionButton(ns(paste0("submit_adjust_", i)), "Ajouter l'ajustement")
+            )
+          )
+        ),
+        div(
+          style = "display: table-cell; width:25%; border:1px solid #ccc; padding:5px;",
+          uiOutput(ns(paste0("summary_inline_", i)))
+        )
+      ))
+    })
+
+    tagList(
+      div(
+        id = "matrix_container",
+        style = "display: table; width:100%; border-collapse: collapse; margin-bottom:15px;",
+        list(table_header, table_rows)
+      ),
+      div(
+        style = "margin-top: 20px; color: #666; font-style: italic;",
+        "Remarque: sélectionnez le plan, les coûts et les hypothèses pour chaque ligne."
+      )
+    )
+  })
+
+
+  # ----------------------------------------------------------------------------
+  # TRACK SELECTIONS
+  # ----------------------------------------------------------------------------
+  observe({
+    req(row_count())
+    current <- stored_selections()
+    for (i in 1:row_count()) {
+      current$plans[[i]] <- input[[paste0("row_plan_", i)]] %||% get_safe(current$plans, i)
+      current$costs[[i]] <- input[[paste0("row_cost_", i)]] %||% get_safe(current$costs, i)
+      current$assumptions[[i]] <- input[[paste0("row_assumption_", i)]] %||% get_safe(current$assumptions, i)
+    }
+    stored_selections(current)
+  })
+
+  # ----------------------------------------------------------------------------
+  # DYNAMIC INPUTS FOR ADJUSTMENTS
+  # ----------------------------------------------------------------------------
+  observe({
+    lapply(1:row_count(), function(i) {
+      output[[paste0("dynamic_input_", i)]] <- renderUI({
+        param <- input[[paste0("row_param_", i)]]
+        if (is.null(param) || param == "") {
+          return(NULL)
+        }
+        switch(param,
+
+               # Campagne MII
+               "Campagne MII : personnes par moustiquaire" = numericInput(ns(paste0("adj_val_", i)), "Nouveau nombre de personnes par moustiquaire :", 1.8, min = 1, step = 0.1),
+               "Campagne MII : population cible" = selectInput(ns(paste0("adj_val_", i)), "Nouvelle population cible :",
+                                                                 choices = c("Population totale", "Enfants de moins de 5 ans", "Enfants de moins de 5 ans et femmes enceintes", "Enfants de moins de 10 ans"), selected = "Population totale"
+               ),
+               "Campagne MII : couverture de la population cible" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 100),
+               "Campagne MII : moustiquaires par balle" = numericInput(ns(paste0("adj_val_", i)), "Nouveau nombre de moustiquaires par balle :", 50, min = 1, step = 1),
+               "Campagne MII : marge de moustiquaires (%)" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+
+               # Routine MII
+               "Routine MII : population cible" = selectInput(ns(paste0("adj_val_", i)), "Nouvelle population cible :",
+                                                                   choices = c("Population totale", "Enfants de moins de 5 ans", "Enfants de moins de 5 ans et femmes enceintes", "Enfants de moins de 10 ans"), selected = "Enfants de moins de 5 ans et femmes enceintes"
+               ),
+               "Routine MII : couverture de la population cible" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 30),
+               "Routine MII : marge de moustiquaires (%)" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+
+               # TPIp
+               "TPIp : fréquentation CPN" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 80),
+               "TPIp : points de contact" = numericInput(ns(paste0("adj_val_", i)), "Nouveaux points de contact :", 3, min = 1),
+               "TPIp : marge pour l’approvisionnement en médicaments" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+
+               # CPS
+               "CPS : population cible" = selectInput(ns(paste0("adj_val_", i)), "Nouvelle population cible :", choices = c("Enfants de 3 mois à 5 ans", "Enfants de 3 mois à 10 ans"), selected = "Enfants de 3 mois à 5 ans"),
+               "CPS : couverture de la population cible" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 100),
+               "CPS : cycles" = numericInput(ns(paste0("adj_val_", i)), "Nouveaux cycles :", 4, min = 1),
+               "CPS : ciblage par âge" = textInput(ns(paste0("adj_val_", i)), "Nouvelles proportions par âge :", "0.18,0.77"),
+               "CPS : marge pour l’approvisionnement en médicaments" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+
+               # CPP
+               "CPP : couverture" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 85),
+               "CPP : points de contact" = numericInput(ns(paste0("adj_val_", i)), "Nouveaux points de contact :", 4, min = 1),
+               "CPP : facteur de mise à l’échelle nutritionnelle" = sliderInput(ns(paste0("adj_val_", i)), "Nouveau facteur de mise à l’échelle nutritionnelle (%) :", 0, 100, 75),
+               "CPP : marge pour l’approvisionnement en médicaments" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+
+               # Vaccination
+               "Vaccination : couverture" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 84),
+               "Vaccination : nombre de doses" = numericInput(ns(paste0("adj_val_", i)), "Nouveau nombre de doses :", 4, min = 1),
+               "Vaccination : marge pour l’approvisionnement" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10)
         )
       })
     })
-
-    # Generate header row with safety check
-    header_row <- tryCatch({
-      div(
-        style = paste0("display: grid; margin-bottom: 10px; margin-left: 150px; grid-template-columns: repeat(", length(cost_titles) + 1, ", 1fr); gap: 10px;"),
-        lapply(c(cost_titles, "ITN Target Population"), function(name) {
-          div(style = "text-align: center; font-weight: bold;", HTML(name))
-        })
-      )
-    }, error = function(e) {
-      message("Error generating header row: ", e$message)
-      # Return a simpler header if there's an error
-      div(
-        style = "margin-bottom: 10px; margin-left: 150px;",
-        "Error rendering header"
-      )
-    })
-
-    # Return the complete UI
-    tagList(
-      header_row,
-      matrix_inputs,
-      div(
-        style = "margin-top: 20px; color: #666; font-style: italic;",
-        "Note: Only one cost option can be selected per row."
-      )
-    )
   })
 
-  # Add row to matrix
+  # ----------------------------------------------------------------------------
+  # ADD ADJUSTMENTS
+  # ----------------------------------------------------------------------------
+  observe({
+    lapply(1:row_count(), function(i) {
+      observeEvent(input[[paste0("submit_adjust_", i)]], {
+        req(input[[paste0("row_param_", i)]], input[[paste0("adj_val_", i)]])
+        current <- stored_selections()
+        if (length(current$adjustments) < i || is.null(current$adjustments[[i]])) {
+          current$adjustments[[i]] <- list()
+        }
+
+        param <- input[[paste0("row_param_", i)]]
+        value <- input[[paste0("adj_val_", i)]]
+
+        # Remove extra quotes if already present
+        if (is.character(value)) {
+          value <- gsub('"', "", value)
+        }
+
+        # Convert percent inputs to decimal
+        percent_assumptions <- c(
+          "Campagne MII : couverture de la population cible",
+          "Routine MII : couverture de la population cible",
+          "TPIp : fréquentation CPN",
+          "CPS : couverture de la population cible",
+          "CPP : couverture",
+          "CPP : facteur de mise à l’échelle nutritionnelle",
+          "Vaccination : couverture"
+        )
+        if (param %in% percent_assumptions) {
+          value <- as.numeric(value) / 100
+        }
+
+        # Quote string values only
+        if (is.character(value) && is.na(suppressWarnings(as.numeric(value)))) {
+          value <- paste0('"', value, '"')
+        }
+
+        new_adj <- paste0(param, " = ", value)
+
+        # Avoid duplicates
+        if (!(new_adj %in% current$adjustments[[i]])) {
+          current$adjustments[[i]] <- append(current$adjustments[[i]], list(new_adj))
+          stored_selections(current)
+        }
+      })
+    })
+  })
+
+  # ----------------------------------------------------------------------------
+  # INLINE SUMMARY WITH INDIVIDUAL REMOVE LINKS
+  # ----------------------------------------------------------------------------
+  observe({
+    lapply(1:row_count(), function(i) {
+      output[[paste0("summary_inline_", i)]] <- renderUI({
+        stored <- stored_selections()
+        adj_list <- get_safe(stored$adjustments, i)
+        assumption_type <- get_safe(stored$assumptions, i)
+
+        if (!is.null(adj_list) && length(adj_list) > 0) {
+          tagList(
+            tags$b("Ajustements:"),
+            tags$ul(
+              lapply(seq_along(adj_list), function(j) {
+                tags$li(
+                  paste(adj_list[[j]]),
+                  actionLink(ns(paste0("remove_adj_", i, "_", j)), icon("xmark", style = "color: #888;"), style = "margin-left:8px;"),
+                  title = "réinitialiser la variable à la base de référence"
+                )
+              })
+            )
+          )
+        } else if (assumption_type == "Accepter la base de référence") {
+          div(
+            style = "color: #666; font-style: italic;",
+            "🛈 Aucun ajustement n’a été effectué — les hypothèses par défaut seront utilisées."
+          )
+        } else {
+          NULL
+        }
+      })
+    })
+  })
+
+  # ----------------------------------------------------------------------------
+  # REMOVE INDIVIDUAL ADJUSTMENTS
+  # ----------------------------------------------------------------------------
+  observe({
+    lapply(1:row_count(), function(i) {
+      observe({
+        adj_list <- get_safe(stored_selections()$adjustments, i)
+        if (!is.null(adj_list)) {
+          lapply(seq_along(adj_list), function(j) {
+            observeEvent(input[[paste0("remove_adj_", i, "_", j)]],
+              {
+                current <- stored_selections()
+                if (!is.null(current$adjustments[[i]]) && length(current$adjustments[[i]]) >= j) {
+                  current$adjustments[[i]] <- current$adjustments[[i]][-j]
+                  stored_selections(current)
+                }
+              },
+              ignoreInit = TRUE
+            )
+          })
+        }
+      })
+    })
+  })
+
+  # ----------------------------------------------------------------------------
+  # ADD ROW BUTTON
+  # ----------------------------------------------------------------------------
   observeEvent(input$add_row, {
-    new_count <- row_count() + 1
-    row_count(new_count)
+    row_count(row_count() + 1)
   })
 
-  # Process selection button
-  observeEvent(input$process, {
-    req(data_available())
+  # ----------------------------------------------------------------------------
+  # REMOVE ROW BUTTON
+  # ----------------------------------------------------------------------------
+  observeEvent(input$remove_row, {
+    req(row_count() > 1)
+    row_count(row_count() - 1)
+  })
 
-    num_rows <- row_count()
+  # ----------------------------------------------------------------------------
+  # CLEAR ROW SELECTIONS
+  # ----------------------------------------------------------------------------
+  observe({
+    lapply(1:row_count(), function(i) {
+      observeEvent(input[[paste0("clear_row_", i)]], {
+        current <- stored_selections()
 
-    # Get cost information from the dataset
-    cost_titles_df <- cost_titles_reactive()
+        # Reset selections to NULL or default placeholders
+        current$plans[[i]] <- "Sélectionnez un plan"
+        current$costs[[i]] <- "Sélectionnez les coûts"
+        current$assumptions[[i]] <- "Sélectionnez une hypothèse"
+        current$adjustments[[i]] <- list()
 
-    cost_titles <- cost_titles_df$label
-    cost_names <- cost_titles_df$cost_name
+        stored_selections(current)
 
-    # Create a result data frame
-    result_data <- data.frame(
-      Plan = character(num_rows),
-      Selected_Cost = character(num_rows),
-      Target_Population = character(num_rows),
-      stringsAsFactors = FALSE
-    )
-
-    for (i in 1:num_rows) {
-      plan_id <- paste0("row_option_", i)
-      pop_id <- paste0("target_pop_", i)
-
-      # Get selected plan
-      result_data$Plan[i] <- input[[plan_id]]
-
-      # Get selected target population
-      result_data$Target_Population[i] <- input[[pop_id]]
-
-      # Get selected cost (the checked checkbox)
-      for (j in 1:nrow(cost_titles_df)) {
-        checkbox_id <- paste0("cell_", i, "_", j)
-        if (!is.null(input[[checkbox_id]]) && input[[checkbox_id]]) {
-          result_data$Selected_Cost[i] <- cost_names[j]
-          break
-        }
-      }
-    }
-
-    # Update the reactive value
-    matrix_selections(result_data)
-
-    # Show the result table
-    output$result_table <- renderDT({
-      req(matrix_selections())
-      datatable(
-        matrix_selections(),
-        options = list(dom = 't'),
-        rownames = FALSE
-      )
+        # Optionally also reset UI input values
+        updateSelectInput(session, paste0("row_plan_", i), selected = "Sélectionnez un plan")
+        updateSelectInput(session, paste0("row_cost_", i), selected = "Sélectionnez les coûts")
+        updateSelectInput(session, paste0("row_assumption_", i), selected = "Sélectionnez une hypothèse")
+      })
     })
   })
 
-  # Budget generation
-  # Process selection button
-  observeEvent(input$process, {
-    req(data_available())
-
-    num_rows <- row_count()
-
-    # Get cost information from the dataset
-    cost_titles_df <- cost_titles_reactive()
-
-    cost_titles <- cost_titles_df$label
-    cost_names <- cost_titles_df$cost_name
-
-    # Create a result data frame
-    result_data <- data.frame(
-      Plan = character(num_rows),
-      Selected_Cost = character(num_rows),
-      Target_Population = character(num_rows),
-      stringsAsFactors = FALSE
-    )
-
-    for (i in 1:num_rows) {
-      plan_id <- paste0("row_option_", i)
-      pop_id <- paste0("target_pop_", i)
-
-      # Get selected plan
-      result_data$Plan[i] <- input[[plan_id]]
-
-      # Get selected target population
-      result_data$Target_Population[i] <- input[[pop_id]]
-
-      # Get selected cost (the checked checkbox)
-      for (j in 1:nrow(cost_titles_df)) {
-        checkbox_id <- paste0("cell_", i, "_", j)
-        if (!is.null(input[[checkbox_id]]) && input[[checkbox_id]]) {
-          result_data$Selected_Cost[i] <- cost_names[j]
-          break
-        }
-      }
+  # ----------------------------------------------------------------------------
+  # DISABLE MATRIX UI WHEN GENERATING
+  # ----------------------------------------------------------------------------
+  observe({
+    if (budget_generating()) {
+      shinyjs::disable("matrix_container")
+    } else {
+      shinyjs::enable("matrix_container")
     }
-
-    # Update the reactive value
-    matrix_selections(result_data)
-
-    # Show the result table
-    output$result_table <- renderDT({
-      req(matrix_selections())
-      datatable(
-        matrix_selections(),
-        options = list(dom = 't'),
-        rownames = FALSE
-      )
-    })
   })
 
-  # generate budgets
+
+
+  # ----------------------------------------------------------------------------
+  # GENERATE BUDGETS
+  # ----------------------------------------------------------------------------
   observeEvent(input$generate_budgets, {
+    # if lite version of tool turned on - set this message to show
     if (lite_mode) {
       showModal(modalDialog(
-        title = "Feature Disabled",
-        "Budget generation is disabled in this demonstration version of the tool.
-      This button is provided for illustrative purposes only.",
+        title = "Fonctionnalité désactivée",
+        "La génération de budget est désactivée dans cette version de démonstration de l'outil.
+      Ce bouton est fourni à titre indicatif uniquement.",
         easyClose = TRUE
       ))
       return()
     }
-    req(matrix_selections(), data_available())
 
-    # Show loading indicator
+    # ensure there is matrix data
+    req(row_count() > 0)
+
+    # Show loader
     budget_generating(TRUE)
     shinyjs::show("loading_container")
 
-    # Process selections for budget generation
-    budget_inputs <- process_selections_for_budget(
-      matrix_selections(),
-      scenario_data(),
-      cost_data()
+    on.exit(
+      {
+        budget_generating(FALSE)
+        shinyjs::hide("loading_container")
+      },
+      add = TRUE
     )
 
-    # Only continue if we have valid selections
-    if (nrow(budget_inputs) == 0) {
-      showNotification("No valid combinations to process", type = "warning")
-      budget_generating(FALSE)
-      shinyjs::hide("loading_container")
+    # Validate that all rows have valid selections
+    invalid_rows <- vector()
+
+    for (i in 1:row_count()) {
+      plan <- input[[paste0("row_plan_", i)]]
+      cost <- input[[paste0("row_cost_", i)]]
+      assumption <- input[[paste0("row_assumption_", i)]]
+
+      if (
+        is.null(plan) || plan == "Sélectionnez un plan" ||
+          is.null(cost) || cost == "Sélectionnez les coûts" ||
+          is.null(assumption) || assumption == "Sélectionnez une hypothèse"
+      ) {
+        invalid_rows <- c(invalid_rows, i)
+      }
+    }
+
+    # Save to reactiveVal
+    incomplete_rows(invalid_rows)
+
+    if (length(invalid_rows) > 0) {
+      showModal(modalDialog(
+        title = "Champs manquants",
+        "Assurez-vous que toutes les sélections (plan, coûts, hypothèses) ont été complétées pour chaque ligne visible. Supprimez les lignes qui ne sont pas nécessaires.",
+        easyClose = TRUE,
+        footer = modalButton("Fermer")
+      ))
       return()
     }
 
-    # Create a progress notification
-    withProgress(
-      message = "Generating budgets",
-      detail = "This may take a while...",
-      value = 0,
-      {
-        # Run generate_budget for each combination and collect results
-        all_budgets <- list()
-        budget_details <- list() # Store details for each budget
-
-        for (i in 1:nrow(budget_inputs)) {
-          # Update progress
-          incProgress(
-            1/nrow(budget_inputs),
-            detail = paste("Processing budget", i, "of", nrow(budget_inputs))
-          )
-
-          # Extract data for this combination
-          scen_data <- budget_inputs$scen_data[[i]]
-          cost_option_data <- budget_inputs$cost_option_data[[i]]
-          target_pop_type <- budget_inputs$Target_Population[i]
-
-          # Generate the budget
-          tryCatch({
-            # Call the generate_budget function you provided
-            budget_result <- generate_budget(scen_data, cost_option_data)
-
-            # Extract years from the budget result
-            years <- sort(unique(budget_result$year))
-            years_string <- paste(years, collapse = ", ")
-
-            # Add metadata for identification
-            budget_result <- budget_result %>%
-              mutate(
-                source_scenario = budget_inputs$Plan[i],
-                source_cost = budget_inputs$Selected_Cost[i],
-                generation_date = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
-              )
-
-            # Add to results
-            all_budgets[[i]] <- budget_result
-            budget_details[[i]] <- list(
-              scenario = budget_inputs$Plan[i],
-              cost = budget_inputs$Selected_Cost[i],
-              years = years_string,
-              combination = paste(budget_inputs$Plan[i], "with", budget_inputs$Selected_Cost[i])
-            )
-          }, error = function(e) {
-            showNotification(
-              paste("Error generating budget for", budget_inputs$Plan[i], ":", e$message),
-              type = "error",
-              duration = 10
-            )
-          })
-        }
-
-        # Combine all budget results
-        if (length(all_budgets) > 0) {
-          combined_budgets <- bind_rows(all_budgets)
-
-          # Extract details for budget history
-          combinations <- sapply(budget_details, function(x) x$combination)
-          all_years <- unique(unlist(lapply(budget_details, function(x) strsplit(x$years, ", ")[[1]])))
-          all_years_string <- paste(sort(all_years), collapse = ", ")
-
-          # Create formatted combinations for display
-          formatted_combinations <- paste(combinations, collapse = " | ")
-
-          # Save to file
-          timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
-          save_path <- file.path("generated", paste0("budgets_", timestamp, ".rds"))
-          saveRDS(combined_budgets, save_path)
-
-          # Update budget history with more detailed information
-          current_history <- budget_history()
-          new_entry <- data.frame(
-            date_generated = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
-            num_budgets = length(all_budgets),
-            scenario_cost_combinations = formatted_combinations,
-            years_generated = all_years_string,
-            file_path = save_path,
-            stringsAsFactors = FALSE
-          )
-
-          updated_history <- bind_rows(current_history, new_entry)
-          budget_history(updated_history)
-
-          # Save history to file
-          saveRDS(updated_history, "generated/budget_history.rds")
-
-          # Make budgets available to other tabs
-          budget_results(combined_budgets)
-
-          # IMPORTANT: Update these shared values
-          shared$budget_results <- combined_budgets
-          shared$budget_results_available <- TRUE
-
-          # Add diagnostics
-          message("Budget data shared: ", nrow(combined_budgets), " rows of data available")
-          message("Budget data columns: ", paste(names(combined_budgets), collapse=", "))
-
-          # Force a reactive invalidation to ensure tab3 updates
-          shared$refresh_trigger <- shared$refresh_trigger + 1
-
-          # Show success notification
-          showNotification(
-            paste("Successfully generated", length(all_budgets), "budgets"),
-            type = "message"
-          )
-        }
-      }
-    )
-
-    # Hide loading indicator
-    budget_generating(FALSE)
-    shinyjs::hide("loading_container")
-  })
-
-  # Render budget history table - Updated to display the new format
-  output$budget_history_table <- renderDT({
-    req(budget_history())
-
-    # Format the table for display
-    df <- budget_history()
-    if ("file_path" %in% names(df)) {
-      df <- df %>% select(-file_path)
+    # process matrix selections safely
+    n_rows <- row_count() %||% 1
+    if (!is.numeric(n_rows) || is.na(n_rows) || n_rows <= 0) {
+      showModal(modalDialog("Aucune ligne valide n’est disponible pour générer un budget."))
+      return()
     }
 
-    # Format the table with better column names and organization
-    datatable(
-      df,
-      colnames = c(
-        "Date Generated" = "date_generated",
-        "Number of Budgets" = "num_budgets",
-        "Scenario-Cost Combinations" = "scenario_cost_combinations",
-        "Years" = "years_generated"
-      ),
-      options = list(
-        pageLength = 5,
-        dom = 'ftip',
-        order = list(list(0, 'desc')),
-        columnDefs = list(
-          list(className = 'dt-center', targets = c(0, 1, 3)),
-          list(width = '45%', targets = 2)
+    matrix_data <- lapply(1:n_rows, function(i) {
+      list(
+        plan = input[[paste0("row_plan_", i)]],
+        cost = input[[paste0("row_cost_", i)]],
+        assumption_type = input[[paste0("row_assumption_", i)]],
+        adjustments = get_safe(stored_selections()$adjustments, i) %||% list()
+      )
+    })
+
+    matrix_selections(matrix_data)
+
+    # Notify user and start progress bar
+    showNotification("Début de la génération des budgets...", type = "message", duration = NULL)
+
+
+    # Run through each budget generation process
+    withProgress(message = "Génération en cours", detail = "Traitement des budgets...", value = 0, {
+      results <- list()
+      history_entries <- list()
+
+      for (i in seq_along(matrix_data)) {
+        incProgress(1 / length(matrix_data), detail = paste("Budget", i, "sur", length(matrix_data)))
+
+        row <- matrix_data[[i]]
+        scen <- scenario_data() |> filter(scenario_name == row$plan)
+        cost <- cost_data() |> filter(cost_name == row$cost)
+
+        # gnerate the budget
+        tryCatch(
+          {
+            budget_df <- generate_budget(
+              scen_data = scen,
+              cost_data = cost,
+              assumptions = row$adjustments
+            )
+
+            years <- sort(unique(budget_df$year))
+            years_string <- paste(years, collapse = ", ")
+
+            timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
+            output_path <- paste0("generated/budget_", timestamp, "_", i, ".rds")
+            budget_df$file_path <- output_path
+
+            saveRDS(budget_df, output_path)
+
+            # Add metadata for history
+            entry <- data.frame(
+              date_generated = format(Sys.time(), "%Y-%m-%d"),
+              scenario = budget_df$scenario_name[1],
+              cost = budget_df$cost_name[1],
+              years = years_string,
+              assumption_type = budget_df$assumption_type[1],
+              assumptions_changes = budget_df$assumptions_changes[1],
+              file_path = output_path,
+              stringsAsFactors = FALSE
+            )
+
+            results[[i]] <- budget_df
+            history_entries[[i]] <- entry
+          },
+          error = function(e) {
+            showNotification(
+              paste("Erreur lors de la génération du budget pour", row$plan, ":", e$message),
+              type = "error",
+              duration = NULL
+            )
+          }
         )
+      }
+
+      # Combine and save
+      if (length(results) > 0) {
+        combined_budgets <- bind_rows(results)
+        new_history <- bind_rows(history_entries)
+
+        budget_history(rbind(budget_history(), new_history))
+        saveRDS(budget_history(), "generated/budget_history.rds")
+
+        # Share for other tabs
+        budget_results(combined_budgets)
+        shared$budget_results <- combined_budgets
+        shared$budget_results_available <- TRUE
+
+        # Trigger reactive refresh
+        shared$refresh_trigger <- shared$refresh_trigger + 1
+
+        showNotification(
+          paste(length(results), "budgets générés avec succès."),
+          type = "message",
+          duration = NULL
+        )
+      } else {
+        showNotification("Aucun budget valide n’a été généré.", type = "warning")
+      }
+    })
+  })
+
+
+  # ----------------------------------------------------------------------------
+  # RENDER BUDGET HISTORY TABLE
+  # ----------------------------------------------------------------------------
+  output$budget_history_table <- renderDT({
+    df <- budget_history()
+    df$date_generated <- format(as.Date(df$date_generated), "%Y-%m-%d")
+
+    if (is.null(df) || nrow(df) == 0) {
+      # Return an empty placeholder table with column names
+      empty_df <- data.frame(
+        date_generated = character(),
+        scenario = character(),
+        cost = character(),
+        assumption_type = character(),
+        assumptions_changes = character(),
+        years = character(),
+        actions = character(),
+        stringsAsFactors = FALSE
+      )
+
+      return(datatable(
+        empty_df,
+        colnames = c(
+          "Date", "Scénario", "Coût", "Type d'hypothèses",
+          "Hypothèses modifiées", "Années", "Action"
+        ),
+        options = list(
+          language = list(url = "//cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json")
+        )
+      ))
+    }
+
+    # Add delete button column
+    df$actions <- paste0(
+      '<button class="btn btn-warning btn-sm delete-budget-btn" data-path="',
+      df$file_path, '" title="Supprimer ce budget">Supprimer</button>'
+    )
+
+    datatable(
+      df[, c("date_generated", "scenario", "cost", "assumption_type", "assumptions_changes", "years", "actions")],
+      colnames = c("Date", "Scénario", "Coût", "Type d'hypothèses", "Hypothèses modifiées", "Années", "Action"),
+      escape = FALSE,
+      rownames = FALSE,
+      options = list(
+        pageLength = 10,
+        scrollX = TRUE,
+        columnDefs = list(list(targets = 6, orderable = FALSE)),
+        language = list(url = "//cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json")
       ),
-      rownames = FALSE
+      callback = JS(
+        sprintf(
+          "table.on('click', '.delete-budget-btn', function() {
+      var path = $(this).data('path');
+      Shiny.setInputValue('%s', path, {priority: 'event'});
+    });",
+          ns("confirm_delete_path") # 👈 correctly namespace the input ID
+        )
+      )
     )
   })
 
-  # Return reactive values that might be needed by other modules
-  return(list(
-    budget_results = budget_results
-  ))
+  # ----------------------------------------------------------------------------
+  # DELETE SELECTED BUDGET FILE WITH FEEDBACK
+  # ----------------------------------------------------------------------------
+  observeEvent(input$confirm_delete_path, {
+    showModal(modalDialog(
+      title = "Confirmer la suppression",
+      "Voulez-vous vraiment supprimer ce budget ?",
+      easyClose = FALSE,
+      footer = tagList(
+        modalButton("Annuler"),
+        actionButton(ns("confirm_delete_yes"), "Oui, supprimer", class = "btn-warning")
+      )
+    ))
+    shared$path_to_delete <- input$confirm_delete_path
+  })
+
+  # ----------------------------------------------------------------------------
+  # FINAL DELETE
+  # ----------------------------------------------------------------------------
+  observeEvent(input$confirm_delete_yes, {
+    removeModal()
+
+    path <- shared$path_to_delete
+    if (!file.exists(path)) {
+      showNotification("❌ Fichier introuvable. Suppression échouée.", type = "error", duration = 5)
+      return()
+    }
+
+    success <- tryCatch(
+      {
+        file.remove(path)
+      },
+      error = function(e) FALSE
+    )
+
+    if (isTRUE(success)) {
+      # Remove from in-memory budget history and save
+      hist <- budget_history()
+      hist <- hist[hist$file_path != path, ]
+      budget_history(hist)
+      saveRDS(hist, "generated/budget_history.rds")
+
+      # ✅ BONUS: Also remove from shared$budget_results
+      if (!is.null(shared$budget_results)) {
+        shared$budget_results <- shared$budget_results %>% filter(file_path != path)
+      }
+
+      # Update reactive flags
+      shared$budget_results_available <- nrow(hist) > 0
+      shared$refresh_trigger <- shared$refresh_trigger + 1
+
+      showNotification("✅ Budget supprimé avec succès.", type = "message", duration = 4)
+    } else {
+      showNotification("❌ Échec de la suppression du fichier.", type = "error", duration = 5)
+    }
+
+    shared$path_to_delete <- NULL # Clear temp value
+  })
 }
-
-

@@ -1,56 +1,94 @@
-tab3Server <- function(input, output, session, lga_outline, state_outline, country_outline,
-                       shared) {
+tab3Server <- function(input, output, session, adm2_outline, adm1_outline, shared) {
   # Namespace for the session
   ns <- session$ns
+
+  # Adding instructions pop up
+  observeEvent(input$show_instructions, {
+    showModal(modalDialog(
+      title = "Instructions détaillées pour l'utilisation du point de contrôle",
+      easyClose = TRUE,
+      size = "l",
+      footer = modalButton("Fermer"),
+      tagList(
+        p("Cette section permet aux utilisateurs de visualiser les résultats détaillés d'un plan budgétisé sélectionné. Elle comprend des cartes, des tableaux et des synthèses visuelles présentant la répartition spatiale, la répartition des coûts et le profil budgétaire global du plan d'intervention sélectionné."),
+        tags$b("Étapes d'utilisation :"),
+        tags$ol(
+          tags$li("🧾 Sélectionnez les entrées en haut de la page (plan, échelle, année, devise)."),
+          tags$li("🧭 Consultez la section Aperçu du plan."),
+          tags$li("🗺️ Explorez les cartes : Mix d'intervention complet et Intervention spécifique."),
+          tags$li("👥 Consultez les chiffres principaux de la population et du budget."),
+          tags$li("📋 Consultez le tableau récapitulatif du budget."),
+          tags$li("📈 Explorez les visualisations budgétaires par article, catégorie et géographie."),
+          tags$li("🔍 Utilisez des filtres et des outils interactifs. Survolez et utilisez les icônes ℹ️ pour obtenir des explications.")
+        ),
+        p("📝 Conseil : utilisez cet onglet pour vérifier la couverture des interventions dans toutes les zones géographiques et évaluer la concentration budgétaire par intervention ou par région avant de comparer les plans.")
+      )
+    ))
+  })
 
   # Create a local reactiveVal to track data availability specifically for this tab
   local_data_available <- reactiveVal(FALSE)
 
+  observe({
+    print(colnames(shared$budget_results))
+  })
+
   # Add reactive for scenario data
   scenario_data <- reactive({
     cache <- shared$scenario_uploads_cache
-    if (is.null(cache) || !is.reactive(cache)) return(NULL)
+    if (is.null(cache) || !is.reactive(cache)) {
+      return(NULL)
+    }
     cache()
   })
 
   # Observe new uploads or changes from the shared state
-  observeEvent(shared$refresh_trigger, {
-    message("🔄 Refreshing data in tab3...")
-    shared$reload_all_uploads()
-  }, ignoreInit = FALSE)
+  observeEvent(shared$refresh_trigger,
+    {
+      message("🔄 Refreshing data in tab3...")
+      shared$reload_all_uploads()
+    },
+    ignoreInit = FALSE
+  )
 
   # Check data availability once at startup
-  observe({
-    # Only run this once when the module initializes
-    if (!is.null(shared$budget_results) &&
+  observe(
+    {
+      # Only run this once when the module initializes
+      if (!is.null(shared$budget_results) &&
         is.data.frame(shared$budget_results) &&
         nrow(shared$budget_results) > 0) {
-      message("Tab3: Budget data availability detected. Rows: ", nrow(shared$budget_results))
-      local_data_available(TRUE)
-    } else {
-      message("Tab3: No budget data available at startup")
-      local_data_available(FALSE)
-    }
-  }, priority = 1000)
+        message("Tab3: Budget data availability detected. Rows: ", nrow(shared$budget_results))
+        local_data_available(TRUE)
+      } else {
+        message("Tab3: No budget data available at startup")
+        local_data_available(FALSE)
+      }
+    },
+    priority = 1000
+  )
 
   # Log scenario data when available
-  observe({
-    req(scenario_data())
-    message("📊 Scenario data is available in tab3. Rows: ", nrow(scenario_data()))
+  observe(
+    {
+      req(scenario_data())
+      message("📊 Scenario data is available in tab3. Rows: ", nrow(scenario_data()))
 
-    # For debugging, log some basic info about the scenario data
-    if (nrow(scenario_data()) > 0) {
-      message("📊 Scenario data overview:")
-      if ("scenario_name" %in% colnames(scenario_data())) {
-        unique_scenarios <- unique(scenario_data()$scenario_name)
-        message("Available scenarios: ", paste(unique_scenarios, collapse=", "))
+      # For debugging, log some basic info about the scenario data
+      if (nrow(scenario_data()) > 0) {
+        message("📊 Scenario data overview:")
+        if ("scenario_name" %in% colnames(scenario_data())) {
+          unique_scenarios <- unique(scenario_data()$scenario_name)
+          message("Available scenarios: ", paste(unique_scenarios, collapse = ", "))
+        }
+        if ("year" %in% colnames(scenario_data())) {
+          years <- sort(unique(scenario_data()$year))
+          message("Available years: ", paste(years, collapse = ", "))
+        }
       }
-      if ("year" %in% colnames(scenario_data())) {
-        years <- sort(unique(scenario_data()$year))
-        message("Available years: ", paste(years, collapse=", "))
-      }
-    }
-  }, priority = 900)
+    },
+    priority = 900
+  )
 
   # Only check data when the reload button is clicked
   observeEvent(input$reload_budget_data, {
@@ -59,8 +97,8 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
     # Update local availability after reload
     if (!is.null(shared$budget_results) &&
-        is.data.frame(shared$budget_results) &&
-        nrow(shared$budget_results) > 0) {
+      is.data.frame(shared$budget_results) &&
+      nrow(shared$budget_results) > 0) {
       message("Tab3: Budget data availability detected after reload. Rows: ", nrow(shared$budget_results))
       local_data_available(TRUE)
     } else {
@@ -80,10 +118,10 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
     req(shared$budget_results)
 
     # Extract unique combinations of source_scenario and source_cost
-    plan_combinations <- shared$budget_results %>%
-      select(source_scenario, source_cost) %>%
-      distinct() %>%
-      mutate(plan_label = paste0(source_scenario, " with ", source_cost))
+    plan_combinations <-
+      shared$budget_results %>%
+      select(plan_id) %>%
+      distinct()
 
     return(plan_combinations)
   })
@@ -106,21 +144,18 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
     if (is.null(plans) || nrow(plans) == 0) {
       return(selectInput(
         ns("plan_select"),
-        "Select the Plan:",
-        choices = c("No plans available - generate budgets first"),
+        "Sélectionnez le budget:",
+        choices = c("Aucun budget disponible – générez d’abord des budgets"),
         selected = NULL
       ))
     }
 
     # Create choices with labels and values
-    choices <- c("", setNames(
-      paste0(plans$source_scenario, "|||", plans$source_cost),
-      plans$plan_label
-    ))
+    choices <- c("", plans$plan_id)
 
     selectInput(
       ns("plan_select"),
-      "Select the Plan:",
+      "Sélectionnez le budget:",
       choices = choices,
       selected = ""
     )
@@ -133,22 +168,22 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
     if (is.null(years) || length(years) == 0) {
       return(selectInput(
         ns("year_select"),
-        "Select Years of Interest:",
-        choices = c("No years available - generate budgets first"),
+        "Sélectionnez les années d'intérêt:",
+        choices = c("Aucune année disponible - générez d'abord les budgets"),
         selected = NULL
       ))
     }
 
     # Create choices - only include "All Years" if there's more than one year
     if (length(years) > 1) {
-      choices <- c("", as.character(years), "All Years")
+      choices <- c("", as.character(years), "Toutes les années")
     } else {
       choices <- c("", as.character(years))
     }
 
     selectInput(
       ns("year_select"),
-      "Select Years of Interest:",
+      "Sélectionnez les années d'intérêt:",
       choices = choices,
       selected = ""
     )
@@ -163,59 +198,44 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
       unique_scenarios <- unique(scenario_data()$scenario_name)
       scenario_years <- scenario_data() %>%
         group_by(scenario_name) %>%
-        summarize(years = paste(sort(unique(year)), collapse=", "))
+        summarize(years = paste(sort(unique(year)), collapse = ", "))
 
-      html_content <- "<h4>Available Scenarios:</h4><ul>"
+      html_content <- "<h4>Scénarios disponibles:</h4><ul>"
       for (i in 1:nrow(scenario_years)) {
-        html_content <- paste0(html_content,
-                               "<li><strong>", scenario_years$scenario_name[i],
-                               "</strong>: Years (", scenario_years$years[i], ")</li>")
+        html_content <- paste0(
+          html_content,
+          "<li><strong>", scenario_years$scenario_name[i],
+          "</strong>: Années (", scenario_years$years[i], ")</li>"
+        )
       }
       html_content <- paste0(html_content, "</ul>")
 
       return(HTML(html_content))
     } else {
-      return(HTML("<p>No scenario data available</p>"))
+      return(HTML("<p>Aucune donnée de scénario disponible</p>"))
     }
   })
 
-  # Parse the selected plan to get scenario and cost
-  selected_plan_details <- reactive({
+  # Parse the selected plan
+  selected_plan_id <- reactive({
     req(input$plan_select)
-
     if (input$plan_select == "") {
       return(NULL)
     }
-
-    # Split the combined value to get scenario and cost
-    split_value <- strsplit(input$plan_select, "\\|\\|\\|")[[1]]
-
-    if (length(split_value) == 2) {
-      return(list(
-        scenario = split_value[1],
-        cost = split_value[2]
-      ))
-    } else {
-      return(NULL)
-    }
+    input$plan_select
   })
 
   # Filter the budget results based on user selections
   filtered_budget <- reactive({
     req(shared$budget_results)
-    req(selected_plan_details())
+    req(selected_plan_id())
     req(input$year_select)
 
     result <- shared$budget_results %>%
-      filter(
-        scenario_name == selected_plan_details()$scenario,
-        cost_name == selected_plan_details()$cost
-      )
+      filter(plan_id == selected_plan_id())
 
-    # Filter by year if a specific year is selected
-    if (input$year_select != "" && input$year_select != "All Years") {
-      result <- result %>%
-        filter(year == as.numeric(input$year_select))
+    if (input$year_select != "" && input$year_select != "Toutes les années") {
+      result <- result %>% filter(year == as.numeric(input$year_select))
     }
 
     return(result)
@@ -227,40 +247,72 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
     # Can add more debug info here
   })
 
+  # helper function for validation
+  validate_plan_inputs <- function(input) {
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale.")
+    )
+  }
+
+
   #-Reactive: Filter LGA list based on selected state----------------------------------------
-  lga_list <- reactive({
-    req(input$state_select)
-     unique(lga_outline$lga[lga_outline$state == input$state_select])
+  adm2_list <- reactive({
+    req(input$adm1_select)
+    unique(adm2_outline$adm2[adm2_outline$adm1 == input$adm1_select])
   })
 
   #-Generate UI for State Selection----------------------------------------------------------
-  output$state_ui <- renderUI({
-    req(input$spatial_scale %in% c("State", "LGA"))
+  output$adm1_ui <- renderUI({
+    req(input$spatial_scale %in% c("Province", "Zone de santé"))
     selectizeInput(
-      session$ns("state_select"),
-      "Select State:",
-      choices = c("", unique(lga_outline$state)),
+      session$ns("adm1_select"),
+      "Sélectionnez la province:",
+      choices = c("", unique(adm2_outline$adm1)),
       selected = "",
-      options = list(placeholder = "Type or select a state", allowEmptyOption = TRUE)
+      options = list(placeholder = "Tapez ou sélectionnez une province", allowEmptyOption = TRUE)
     )
   })
 
   #-Generate UI for LGA Selection-----------------------------------------------------------
-  output$lga_ui <- renderUI({
-    req(input$spatial_scale == "LGA", input$state_select)
+  output$adm2_ui <- renderUI({
+    req(input$spatial_scale == "Zone de santé", input$adm1_select)
     selectizeInput(
-      session$ns("lga_select"),
-      "Select LGA:",
-      choices = c("", lga_list()),
+      session$ns("adm2_select"),
+      "Sélectionnez la zone de santé:",
+      choices = c("", adm2_list()),
       selected = "",
-      options = list(placeholder = "Type or select an LGA", allowEmptyOption = TRUE)
+      options = list(placeholder = "Tapez ou sélectionnez une zone de santé", allowEmptyOption = TRUE)
     )
   })
 
+  #-UI for budget envelope------------------------------------------------------------------
+  output$budget_envelope_ui <- renderUI({
+    req(input$year_select == "Toutes les années")
+
+    tagList(
+      div(
+        style = "margin-bottom: 1rem;",
+        card(
+          card_header(tagList(icon("hand-holding-usd"), " Saisir le budget disponible")),
+          card_body(
+            numericInput(ns("available_budget"), "Budget disponible", value = NULL, min = 0),
+            selectInput(ns("available_currency"), "Devise", choices = c("USD", "CDF"), selected = input$currency_select),
+            helpText("⚠️ Disponible uniquement si «Toutes les années» est sélectionné.")
+          ),
+          class = "bg-light"
+        )
+      )
+    )
+  })
+
+
   #-Adding plan description-----------------------------------------------------------------
   output$page_description <- renderUI({
-    req(input$plan_select, input$year_select, input$spatial_scale)
-    req(filtered_budget())  # Make sure filtered budget data is available
+    validate_plan_inputs(input)
+
+    req(filtered_budget()) # Make sure filtered budget data is available
 
     # Check if scenario_description column exists and get scenario description
     if ("scenario_description" %in% colnames(filtered_budget())) {
@@ -282,26 +334,46 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
       cost_desc <- selected_plan_details()$cost
     }
 
-    if (length(plan_desc) == 0) plan_desc <- "No description available"
-    if (length(cost_desc) == 0) cost_desc <- "No cost description available"
+
+    # Check if assumptions_changes column exists and get cost description
+    if ("assumptions_changes" %in% colnames(filtered_budget())) {
+      assum_desc <- filtered_budget() %>%
+        pull(assumptions_changes) %>%
+        unique()
+    } else {
+      # Fallback to cost_name if description isn't available
+      assum_desc <- NULL
+    }
+
+    if (length(plan_desc) == 0) plan_desc <- "Aucune description disponible"
+    if (length(cost_desc) == 0) cost_desc <- "Aucune description des coûts disponible"
+    if (length(assum_desc) == 0) assum_desc <- "Aucune modification d'hypothèse disponible"
 
     # Build the description HTML
-    description <- paste0("<h4>Displaying results for ", input$plan_select,
-                          " at the ", input$spatial_scale, " level for year: ", input$year_select, "</h4>")
+    description <- paste0(
+      "<p><strong>Affichage des résultats pour ", input$plan_select,
+      " au ", input$spatial_scale, " niveau pour l'année: ", input$year_select, "</strong></p>"
+    )
 
-    if (input$spatial_scale == "State" && !is.null(input$state_select) && input$state_select != "") {
-      description <- paste0(description, "<h4>State: ", input$state_select, "</h4>")
+    if (input$spatial_scale == "Province" && !is.null(input$adm1_select) && input$adm1_select != "") {
+      description <- paste0(description, "<p><strong>Province:</strong> ", input$adm1_select, "</p>")
     }
 
-    if (input$spatial_scale == "LGA" && !is.null(input$state_select) && input$state_select != "" &&
-        !is.null(input$lga_select) && input$lga_select != "") {
-      description <- paste0(description, "<h4>State: ", input$state_select, " | LGA: ", input$lga_select, "</h4>")
+    if (input$spatial_scale == "Zone de santé" && !is.null(input$adm1_select) && input$adm1_select != "" &&
+      !is.null(input$adm2_select) && input$adm2_select != "") {
+      description <- paste0(
+        description, "<p><strong>Province:</strong> ", input$adm1_select,
+        " | <strong>Zone de santé:</strong> ", input$adm2_select, "</p>"
+      )
     }
 
-    # Add both the plan description and cost description
-    description <- paste0(description,
-                          "<h5><strong>Plan Description:</strong> ", plan_desc, "</h5>",
-                          "<h5><strong>Cost Description:</strong> ", cost_desc, "</h5>")
+    # Add plan + cost + assumptions
+    description <- paste0(
+      description,
+      "<p><strong>Description du plan:</strong> ", plan_desc, "</p>",
+      "<p><strong>Description des coûts:</strong> ", cost_desc, "</p>",
+      "<p><strong>Description modification d'hypothèse:</strong> ", assum_desc, "</p>"
+    )
 
     HTML(description)
   })
@@ -309,70 +381,54 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
   #-Generate the interactive map-----------------------------------------------------------
   output$interactive_map <- renderLeaflet({
-    req(input$plan_select, input$spatial_scale)  # Wait until a spatial scale is chosen
+    req(input$plan_select, input$spatial_scale) # Wait until a spatial scale is chosen
 
-    if (input$spatial_scale == "State") {
-      req(input$plan_select, input$state_select)
-      # Filter state_outline based on state_selected
-    } else if (input$spatial_scale == "LGA") {
-      req(input$plan_select, input$state_selected, input$lga_select)
-      # Filter lga_outline based on state_selected and lga_selected
+    if (input$spatial_scale == "Province") {
+      req(input$plan_select, input$adm1_select)
+      # Filter adm1_outline based on adm1_selected
+    } else if (input$spatial_scale == "Zone de santé") {
+      req(input$plan_select, input$adm1_selected, input$adm2_select)
+      # Filter adm2_outline based on adm1_selected and adm2_selected
     }
 
     create_intervention_leaflet(
-      lga_outline = lga_outline,
-      state_outline = state_outline,
-      country_outline = country_outline,
+      adm2_outline = adm2_outline,
+      adm1_outline = adm1_outline,
+      country_outline = NULL,
       intervention_mix = filtered_budget(),
       spatial_scale = input$spatial_scale,
-      state_select = input$state_select,
-      lga_select = input$lga_select,
-      center_lng = 9,
-      center_lat = 4,
-      zoom = 5.2
+      adm1_select = input$adm1_select,
+      adm2_select = input$adm2_select
     )
   })
 
-  #-Generate the static maps tabbed-----------------------------------------------------
-  # make maps
-  observe({
+  #-Generate the static maps-----------------------------------------------------
+  # Single static map plot
+  output$static_map_plot <- renderPlot({
     req(input$plan_select)
+    req(filtered_budget())
 
-    years <- unique(filtered_budget()$year)
-    if (length(years) == 0) return(NULL)
+    # Decide whether to filter by year or aggregate
+    static_data <- filtered_budget()
 
-    # Create a tab for each available year plus one for "All Years".
-    lapply(c("All Years", years), function(y) {
-      output[[paste0("static_map_", y)]] <- renderPlot({
-        create_static_map(
-          lga_outline = lga_outline,
-          state_outline = state_outline,
-          filtered_data = filtered_budget(),
-          plan_select = input$plan_select,
-          spatial_scale = input$spatial_scale,
-          state_select = input$state_select,
-          lga_select = input$lga_select,
-          year_value = y
-        )
-      })
-    })
-  })
+    year_label <- input$year_select
+    if (!is.null(year_label) && year_label != "" && year_label != "all_years" && year_label != "Toutes les années") {
+      static_data <- static_data %>% filter(year == as.numeric(year_label))
+    } else {
+      year_label <- "Toutes les années"
+      # could add summarise step if you want to aggregate e.g. counts or means here
+    }
 
-  #-UI for multiple static maps, with tabs for each year--------------------------------
-  output$static_map_tabs <- renderUI({
-    req(input$plan_select)
-
-    years <- unique(filtered_budget()$year)
-    if (length(years) == 0) return(NULL)  # Prevent crash if no data
-    # if (length(years >1)) years <- c(years, "All Years")
-
-    navset_tab(
-      !!!lapply(c(years), function(y) {
-        nav_panel(
-          title = paste(y),
-          withSpinner(plotOutput(session$ns(paste0("static_map_", y)), height = "500px"))
-        )
-      })
+    # Create the static map
+    create_static_map(
+      adm2_outline = adm2_outline,
+      adm1_outline = adm1_outline,
+      filtered_data = static_data,
+      plan_select = input$plan_select,
+      year_value = year_label,
+      spatial_scale = input$spatial_scale,
+      adm1_select = input$adm1_select,
+      adm2_select = input$adm2_select
     )
   })
 
@@ -382,77 +438,71 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
     req(input$plan_select != "")
 
     layout_column_wrap(
-      width = 1/2,  # Two columns, each taking 50% width
+      # width = 1 / 2, # Two columns, each taking 50% width
 
-      # Interactive Map Card
+      # INTERACTIVE MAP CARD
       card(
+        full_screen = TRUE,
         card_header(
-          "Full Intervtion Mix Map",
+          "Carte complète des mix d'interventions",
           tooltip(
             shiny::icon("info-circle"),
-            "Map displays all interventions targeted aggregated over each year of the Plan"
-            )
-          ),
-        full_screen = TRUE,
+            "La carte affiche toutes les interventions ciblées..."
+          )
+        ),
         card_body(
-          class = "p-0",
-          withSpinner(leafletOutput(session$ns("interactive_map")))
+          class = "p-0 d-flex align-items-stretch", # ensure no padding and flexible growth
+          leafletOutput(session$ns("interactive_map")) # no height specified!
         )
       ),
 
-      # Static Map Card: Show either a **single plot** or **tabs**
+      # Static Map Card
       card(
+        full_screen = TRUE,
         card_header(
-          "Intervention Specific Maps",
+          "Cartes spécifiques aux interventions",
           tooltip(
             shiny::icon("info-circle"),
-            "Maps display interventions targeted and type by year. If All Years is selected data is aggregated from each year of the Plan"
-            )
-          ),
-        full_screen = TRUE,
+            "Les cartes présentent les interventions ciblées et leur type par année..."
+          )
+        ),
         card_body(
           class = "p-0",
-          uiOutput(session$ns("static_map_tabs"))  # Always show tabs
+          withSpinner(plotOutput(session$ns("static_map_plot")))
         )
-        )
-
+      )
     )
   })
+
+
+
 
   #-Ribbon Icons------------------------------------------------------------------------
   output$value_boxes <- renderUI({
-
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    # For spatial scales that require a state selection, ensure input$state_select exists
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
-    }
-    # For LGA level, require an LGA selection
-    if (input$spatial_scale == "LGA") {
-      req(input$lga_select)
-    }
+    req(input$currency_select, input$plan_select, input$year_select, input$spatial_scale)
 
     create_icon_summaries(
       spatial_scale = input$spatial_scale,
-      state_select = input$state_select,
-      lga_select = input$lga_select,
+      adm1_select = input$adm1_select,
+      adm2_select = input$adm2_select,
+      year_select = input$year_select,
       currency_select = input$currency_select,
+      available_budget = input$available_budget,
       data = filtered_budget(),
-      year_select = input$year_select
+      target_population = target_population,
+      ns = session$ns # 👈 ensures namespacing works
     )
   })
+
+
 
   #-Budget table summaries-------------------------------------------------------------
   output$budget_table_card <- renderUI({
     req(input$plan_select != "")
     card(
       card_header(
-        "Budget Summary Table",
-        tooltip(
-          shiny::icon("info-circle"),
-          "If State or LGA level is selected, data is calculated for malaria interventions only. Support services costs are not generated at these spatial levels."
-        )
-        ),
+        "Tableau récapitulatif du budget"
+      ),
       card_body(
         withSpinner(DT::dataTableOutput(session$ns("budget_table")))
       )
@@ -461,22 +511,22 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
   output$budget_table <- DT::renderDataTable({
     req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    # For spatial scales that require a state selection, ensure input$state_select exists
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
+    # For spatial scales that require a state selection, ensure input$adm1_select exists
+    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+      req(input$adm1_select)
     }
     # For LGA level, require an LGA selection
-    if (input$spatial_scale == "LGA") {
-      req(input$lga_select)
+    if (input$spatial_scale == "Zone de santé") {
+      req(input$adm2_select)
     }
     # Your create_budget_table() function returns a DT datatable.
     create_budget_table(
       process_budget_data(
-            spatial_scale = input$spatial_scale,
-            state_select = input$state_select,
-            lga_select = input$lga_select,
-            currency_select = input$currency_select,
-            data = filtered_budget()
+        spatial_scale = input$spatial_scale,
+        adm1_select = input$adm1_select,
+        adm2_select = input$adm2_select,
+        currency_select = input$currency_select,
+        data = filtered_budget()
       ),
       currency_select = input$currency_select
     )
@@ -484,24 +534,23 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
   #-Cost Plot elements------------------------------------------------------------------
 
-   #-Donut chart--------------------
+  #-Donut chart--------------------
   output$donut_chart <- renderBillboarder({
-
     req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    # For spatial scales that require a state selection, ensure input$state_select exists
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
+    # For spatial scales that require a state selection, ensure input$adm1_select exists
+    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+      req(input$adm1_select)
     }
     # For LGA level, require an LGA selection
-    if (input$spatial_scale == "LGA") {
-      req(input$lga_select)
+    if (input$spatial_scale == "Zone de santé") {
+      req(input$adm2_select)
     }
 
     donut_plot(
       process_budget_data(
         spatial_scale = input$spatial_scale,
-        state_select = input$state_select,
-        lga_select = input$lga_select,
+        adm1_select = input$adm1_select,
+        adm2_select = input$adm2_select,
         currency_select = input$currency_select,
         data = filtered_budget()
       )
@@ -510,22 +559,21 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
   #-Treemap chart----------------------
   output$treemap_chart <- renderPlotly({
-
     req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    # For spatial scales that require a state selection, ensure input$state_select exists
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
+    # For spatial scales that require a state selection, ensure input$adm1_select exists
+    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+      req(input$adm1_select)
     }
     # For LGA level, require an LGA selection
-    if (input$spatial_scale == "LGA") {
-      req(input$lga_select)
+    if (input$spatial_scale == "Zone de santé") {
+      req(input$adm2_select)
     }
 
     treemap_plot(
       process_budget_data(
         spatial_scale = input$spatial_scale,
-        state_select = input$state_select,
-        lga_select = input$lga_select,
+        adm1_select = input$adm1_select,
+        adm2_select = input$adm2_select,
         currency_select = input$currency_select,
         data = filtered_budget()
       ),
@@ -535,22 +583,21 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
   #-Stacked bar chart---------------------
   output$stacked_barchart <- renderPlotly({
-
     req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    # For spatial scales that require a state selection, ensure input$state_select exists
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
+    # For spatial scales that require a state selection, ensure input$adm1_select exists
+    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+      req(input$adm1_select)
     }
     # For LGA level, require an LGA selection
-    if (input$spatial_scale == "LGA") {
-      req(input$lga_select)
+    if (input$spatial_scale == "Zone de santé") {
+      req(input$adm2_select)
     }
 
     stacked_plot(
       process_item_data(
         spatial_scale = input$spatial_scale,
-        state_select = input$state_select,
-        lga_select = input$lga_select,
+        adm1_select = input$adm1_select,
+        adm2_select = input$adm2_select,
         currency_select = input$currency_select,
         data = filtered_budget()
       ),
@@ -562,20 +609,20 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
   output$stacked_prop <-
     renderPlotly({
       req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-      # For spatial scales that require a state selection, ensure input$state_select exists
-      if (input$spatial_scale %in% c("State", "LGA")) {
-        req(input$state_select)
+      # For spatial scales that require a state selection, ensure input$adm1_select exists
+      if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+        req(input$adm1_select)
       }
       # For LGA level, require an LGA selection
-      if (input$spatial_scale == "LGA") {
-        req(input$lga_select)
+      if (input$spatial_scale == "Zone de santé") {
+        req(input$adm2_select)
       }
 
       stacked_plot_prop(
         process_item_data(
           spatial_scale = input$spatial_scale,
-          state_select = input$state_select,
-          lga_select = input$lga_select,
+          adm1_select = input$adm1_select,
+          adm2_select = input$adm2_select,
           currency_select = input$currency_select,
           data = filtered_budget()
         ),
@@ -585,22 +632,21 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
 
   #-lolipop chart---------------------------
   output$lolipop_chart <- renderPlotly({
-
     req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    # For spatial scales that require a state selection, ensure input$state_select exists
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
+    # For spatial scales that require a state selection, ensure input$adm1_select exists
+    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+      req(input$adm1_select)
     }
     # For LGA level, require an LGA selection
-    if (input$spatial_scale == "LGA") {
-      req(input$lga_select)
+    if (input$spatial_scale == "Zone de santé") {
+      req(input$adm2_select)
     }
 
     lolipop_plot(
       process_item_data(
         spatial_scale = input$spatial_scale,
-        state_select = input$state_select,
-        lga_select = input$lga_select,
+        adm1_select = input$adm1_select,
+        adm2_select = input$adm2_select,
         currency_select = input$currency_select,
         data = filtered_budget()
       ),
@@ -609,215 +655,181 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
   })
 
   #-Map 1 - state total cost------------------
-  output$state_total_map <- renderLeaflet({
+  output$adm1_total_map <- renderLeaflet({
     req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
+    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+      req(input$adm1_select)
     }
 
     cost_dist_map(
-      map_level = "State",
+      map_level = "Province",
       currency_select = input$currency_select,
       map_type = "total",
-      state_select = input$state_select,
+      adm1_select = input$adm1_select,
       data = filtered_budget()
     )
   })
 
   #-Map 2 - state pp cost------------------
-  output$state_pp_map <- renderLeaflet({
+  output$adm1_pp_map <- renderLeaflet({
     req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
+    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+      req(input$adm1_select)
     }
 
     cost_dist_map(
-      map_level = "State",
+      map_level = "Province",
       currency_select = input$currency_select,
       map_type = "per person",
-      state_select = input$state_select,
+      adm1_select = input$adm1_select,
       data = filtered_budget()
     )
   })
 
   #-Map 3 - lga total cost------------------
-  output$lga_total_map <- renderLeaflet({
+  output$adm2_total_map <- renderLeaflet({
     req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
+    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+      req(input$adm1_select)
     }
-    if (input$spatial_scale == "LGA") {
-      req(input$lga_select)
+    if (input$spatial_scale == "Zone de santé") {
+      req(input$adm2_select)
     }
 
     cost_dist_map(
-      map_level = "LGA",
+      map_level = "Zone de santé",
       currency_select = input$currency_select,
       map_type = "total",
-      state_select = input$state_select,
-      lga_select = input$lga_select,
+      adm1_select = input$adm1_select,
+      adm2_select = input$adm2_select,
       data = filtered_budget()
     )
   })
 
   #-Map 4 - lga pp cost------------------
-  output$lga_pp_map <- renderLeaflet({
+  output$adm2_pp_map <- renderLeaflet({
     req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    if (input$spatial_scale %in% c("State", "LGA")) {
-      req(input$state_select)
+    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+      req(input$adm1_select)
     }
-    if (input$spatial_scale == "LGA") {
-      req(input$lga_select)
+    if (input$spatial_scale == "Zone de santé") {
+      req(input$adm2_select)
     }
 
     cost_dist_map(
-      map_level = "LGA",
+      map_level = "Zone de santé",
       currency_select = input$currency_select,
       map_type = "per person",
-      state_select = input$state_select,
-      lga_select = input$lga_select,
+      adm1_select = input$adm1_select,
+      adm2_select = input$adm2_select,
       data = filtered_budget()
     )
   })
 
 
-# #-PLOT ELEMENTS-------------------------------------------------------------------------
+  # #-PLOT ELEMENTS-------------------------------------------------------------------------
   output$cost_charts <- renderUI({
     req(input$plan_select != "")
 
     layout_column_wrap(
-      width = 1/3,  # 3 columns
+      width = 1 / 3, # 3 columns
 
       # Card 1: Proportional Cost Summaries with 2 tabs
       navset_card_tab(
         full_screen = TRUE,
-        title = "Proportional Cost Summaries",
+        title = "Résumés des coûts proportionnels",
         nav_panel(
-          "Plot 1",
-          card_title("Proportion of Total Budget by Item"),
+          "1",
+          card_title("Proportion du budget total par poste"),
           card_body(
             class = "p-0",
             withSpinner(billboarderOutput(session$ns("donut_chart")))
-            )
-
-        ),
-        nav_panel(
-          "Plot 2",
-          card_title("Treemap of Budget Items"),
-          card_body(
-            class = "p-0",
-            withSpinner(plotlyOutput(session$ns("treemap_chart")))
           )
-
         ),
+        # nav_panel(
+        #   "Plot 2",
+        #   card_title("Treemap of Budget Items"),
+        #   card_body(
+        #     class = "p-0",
+        #     withSpinner(plotlyOutput(session$ns("treemap_chart")))
+        #   )
+        #
+        # ),
         nav_panel(
           shiny::icon("circle-info"),
-          markdown("The proportion of each budget item's contribution to the
-                   total budget is displayed using a donut chart - hover over
-                   each section of the chart to see the proportional contribution of
-                   that item (%).<br><br>The Treemap in panel Plot 2 displays
-                   this information in another way, the size of the block for each
-                   item is the relative contribution of that budget item to
-                   the total budget.<br><br> When State or LGA level
-                   information is displayed the Support Services costs are
-                   not generated at this level only costs related to malaria
-                   interventions are shown.")
+          markdown("La proportion de la contribution de chaque poste budgétaire au budget total est affichée à l'aide d'un graphique en anneau: survolez chaque section du graphique pour voir la contribution proportionnelle de ce poste (%).")
         )
       ),
 
       # Card 2: Intervention Cost Breakdowns with 3 tabs
       navset_card_tab(
         full_screen = TRUE,
-        title = "Intervention Cost Summaries",
+        title = "Résumés des coûts d'intervention",
         nav_panel(
-          "Plot 1",
-          card_title("Cost Breakdown by Category per Intervention"),
+          "1",
+          card_title("Répartition des coûts par catégorie et par intervention"),
           card_body(
             class = "p-0",
             withSpinner(plotlyOutput(session$ns("stacked_barchart")))
           )
         ),
         nav_panel(
-          "Plot 2",
-          card_title("% Contribution by Category per Intervention"),
+          "2",
+          card_title("% Contribution par catégorie par intervention"),
           card_body(
             class = "p-0",
             withSpinner(plotlyOutput(session$ns("stacked_prop")))
           )
         ),
         nav_panel(
-          "Plot 3",
-          card_title("Top 15 Specific Cost Components"),
+          "3",
+          card_title("Les 15 principaux éléments de coût spécifiques"),
           card_body(
             class = "p-0",
             withSpinner(plotlyOutput(session$ns("lolipop_chart")))
           )
-
-        ),
-        nav_panel(
-          shiny::icon("circle-info"),
-          markdown("Intervention specific total costs are shown spilt into data on the
-                   cost category within each intervention (procurement, implementation
-                   and support services).<br><br>The top 15 cost elements are then
-                   displayed which highlight which specific line item of
-                   the budget has the largest contribution to the overal
-                   budget estimate.<br><br> When State or LGA level
-                   information is displayed the Support Services costs are
-                   not generated at this level only costs related to malaria
-                   interventions are shown.")
         )
-        ),
+      ),
 
       # Card 3: Spatial Cost Summaries with conditional tabs
       navset_card_tab(
         full_screen = TRUE,
-        title = "Spatial Cost Summaries",
+        title = "Résumés des coûts spatiaux",
         nav_panel(
-          "Plot 1",
-          card_title("State Level Total Costs"),
+          "1",
+          card_title("Coûts totaux au niveau de la province"),
           full_screen = TRUE,
           card_body(
             class = "p-0",
-            withSpinner(leafletOutput(session$ns("state_total_map")))
+            withSpinner(leafletOutput(session$ns("adm1_total_map")))
           )
-
         ),
         nav_panel(
-          "Plot 2",
-          card_title("State Level Cost per Person"),
+          "2",
+          card_title("Coût par personne au niveau de la province"),
           full_screen = TRUE,
           card_body(
             class = "p-0",
-            withSpinner(leafletOutput(session$ns("state_pp_map")))
+            withSpinner(leafletOutput(session$ns("adm1_pp_map")))
           )
         ),
         nav_panel(
-          "Plot 3",
-          card_title("LGA Level Total Costs"),
+          "3",
+          card_title("Coûts totaux au niveau de la zone de santé"),
           full_screen = TRUE,
           card_body(
             class = "p-0",
-            withSpinner(leafletOutput(session$ns("lga_total_map")))
+            withSpinner(leafletOutput(session$ns("adm2_total_map")))
           )
-
         ),
         nav_panel(
-          "Plot 4",
-          card_title("LGA Level Cost per Person"),
+          "4",
+          card_title("Coût par personne dans la zone de santé"),
           full_screen = TRUE,
           card_body(
             class = "p-0",
-            withSpinner(leafletOutput(session$ns("lga_pp_map")))
+            withSpinner(leafletOutput(session$ns("adm2_pp_map")))
           )
-
-        ),
-        nav_panel(
-          shiny::icon("circle-info"),
-          markdown("State and LGA data on the total budget or total budget
-                   per person associated with
-                   the selected plan are displayed. Support Services costs are
-                   not generated at the State and LGA level and data related only costs
-                   associated with malaria interventions are shown.")
         )
       )
     )
@@ -831,7 +843,7 @@ tab3Server <- function(input, output, session, lga_outline, state_outline, count
     updateSelectInput(session, "spatial_scale", selected = "")
     updateSelectInput(session, "year_select", selected = "")
     updateSelectInput(session, "currency_select", selected = "")
-    updateSelectizeInput(session, "state_select", selected = "")
-    updateSelectizeInput(session, "lga_select", selected = "")
+    updateSelectizeInput(session, "adm1_select", selected = "")
+    updateSelectizeInput(session, "adm2_select", selected = "")
   })
 }

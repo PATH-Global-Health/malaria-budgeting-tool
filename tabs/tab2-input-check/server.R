@@ -1,10 +1,13 @@
 tab2Server <- function(input, output, session, shared) {
   ns <- session$ns
 
-  observeEvent(shared$refresh_trigger, {
-    message("🔄 Refreshing scenario data in tab2...")
-    shared$reload_scenarios()
-  }, ignoreInit = FALSE)
+  observeEvent(shared$refresh_trigger,
+    {
+      message("🔄 Refreshing scenario data in tab2...")
+      shared$reload_scenarios()
+    },
+    ignoreInit = FALSE
+  )
 
   scenario_uploads <- reactive({
     shared$scenario_uploads_cache()
@@ -20,10 +23,10 @@ tab2Server <- function(input, output, session, shared) {
     if (!data_available()) {
       output$intervention_tabs <- renderUI({
         card(
-          card_header("No Data Uploaded"),
+          card_header("Aucune donnée téléchargée"),
           card_body(
-            tags$p("No data has been uploaded into the application."),
-            tags$p("Please return to the 'User Input' tab and upload your intervention scenarios.")
+            tags$p("Aucune donnée n'a été téléchargée dans l'application."),
+            tags$p("Veuillez revenir à l’onglet «Saisie utilisateur» et télécharger vos scénarios d’intervention.")
           )
         )
       })
@@ -43,7 +46,7 @@ tab2Server <- function(input, output, session, shared) {
     plans <- unique(scenario_uploads()$scenario_name)
     selectInput(
       ns("plan_select"),
-      "Select the Plan:",
+      "Sélectionnez le plan:",
       choices = c("", sort(plans)),
       selected = ""
     )
@@ -55,8 +58,8 @@ tab2Server <- function(input, output, session, shared) {
     years <- unique(scenario_uploads()$year)
     selectInput(
       ns("year_select"),
-      "Select Years of Interest:",
-      choices = c("", sort(years), "All Years"),
+      "Sélectionnez les années d'intérêt:",
+      choices = c("", sort(years), "Toutes les années"),
       selected = ""
     )
   })
@@ -65,24 +68,24 @@ tab2Server <- function(input, output, session, shared) {
   # Adding instructions pop up
   observeEvent(input$show_instructions, {
     showModal(modalDialog(
-      title = "Detailed Instructions for using the check-point",
+      title = "Instructions détaillées pour l'utilisation du point de contrôle",
       easyClose = TRUE,
       size = "l",
-      footer = modalButton("Close"),
+      footer = modalButton("Fermer"),
       tagList(
-        p("Once a plan has been uploaded the user can move onto the ‘Check Scenario’ tab. This section allows users to validate their uploaded intervention plans and flag any inconsistencies or logic errors. It provides a quick visual and tabular summary of intervention coverage by state and year."),
-        p("The section will also flag or potential delivery errors using warning alerts"),
-        tags$b("Steps to Use:"),
+        p("Une fois le plan téléchargé, l'utilisateur peut accéder à l'onglet « Vérifier le scénario ». Cette section permet de valider les plans d'intervention téléchargés et de signaler toute incohérence ou erreur de logique. Elle fournit un résumé visuel et tabulaire rapide de la couverture des interventions par État et par année."),
+        p("La section signalera également les erreurs de livraison potentielles à l'aide d'alertes d'avertissement."),
+        tags$b("Étapes d'utilisation :"),
         tags$ol(
-          tags$li("📂 Select a previously uploaded plan from the dropdown menu."),
-          tags$li("📅 Select the year of interest from the dropdown list. The data will update accordingly."),
-          tags$li("💉 Click on an intervention tab (e.g., SMC, Vaccine, IRS, etc.) to view targeting information."),
-          tags$li("📊 View headline coverage statistics shown as colored summary boxes: ✅ Full Coverage, 🟧 Partial Coverage, ❌ No Coverage."),
-          tags$li("📋 Review the interactive table below to see detailed counts by state."),
-          tags$li("🔍 Use the search bar to quickly find specific states or values."),
-          tags$li("⚠️ If an intervention targeting error is spotted by the tool this will be flagged to the user. Example: <screen shot>")
+          tags$li("📂 Sélectionnez un plan précédemment téléchargé dans le menu déroulant."),
+          tags$li("📅 Sélectionnez l'année qui vous intéresse dans la liste déroulante. Les données seront mises à jour en conséquence."),
+          tags$li("💉 Cliquez sur un onglet d’intervention (par exemple, SMC, Vaccin, IRS, etc.) pour afficher les informations de ciblage."),
+          tags$li("📊 Consultez les statistiques de couverture des titres affichées sous forme de cases récapitulatives colorées : ✅ Couverture complète, 🟧 Couverture partielle, ❌ Aucune couverture."),
+          tags$li("📋 Consultez le tableau interactif ci-dessous pour voir les décomptes détaillés par État."),
+          tags$li("🔍 Utilisez la barre de recherche pour trouver rapidement des états ou des valeurs spécifiques."),
+          tags$li("⚠️ Si l'outil détecte une erreur de ciblage d'intervention, elle sera signalée à l'utilisateur. Exemple : <capture d'écran>")
         ),
-        p("📝 Tip: Use this section to verify the accuracy of your uploaded scenario before generating budgets.")
+        p("📝 Astuce : utilisez cette section pour vérifier l'exactitude de votre scénario téléchargé avant de générer des budgets.")
       )
     ))
   })
@@ -91,7 +94,7 @@ tab2Server <- function(input, output, session, shared) {
   filtered_data <- reactive({
     req(data_available(), input$plan_select, input$year_select)
 
-    year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
+    year_filter <- if (input$year_select == "Toutes les années" || input$year_select == "") {
       unique(scenario_uploads()$year)
     } else {
       input$year_select
@@ -102,7 +105,7 @@ tab2Server <- function(input, output, session, shared) {
         scenario_name == input$plan_select,
         year %in% year_filter
       ) %>%
-      select(year, state = adm1, lga=adm2, scenario_name, starts_with("code_"), -code_itn_urban) %>%
+      select(year, adm1, adm2, scenario_name, starts_with("code_"), -code_mii_urbain) %>%
       pivot_longer(
         cols = starts_with("code_"),
         names_to = "intervention",
@@ -110,18 +113,18 @@ tab2Server <- function(input, output, session, shared) {
         values_to = "included"
       ) %>%
       mutate(intervention = case_when(
-          intervention == "cm_public" ~ "Case Management Public",
-          intervention == "cm_private" ~ "Case Management Private",
-          intervention == "iptp" ~ "IPTp",
-          intervention == "vacc" ~ "Vaccine",
-          intervention == "itn_routine" ~ "ITN Routine",
-          intervention == "itn_campaign" ~ "ITN Campaign",
-          intervention == "smc" ~ "SMC",
-          intervention == "pmc" ~ "PMC",
-          intervention == "irs" ~ "IRS",
-          intervention == "lsm" ~ "LSM",
-          TRUE ~ intervention)
-      )
+        intervention == "prise_en_charge_public" ~ "Prise en charge public",
+        intervention == "prise_en_charge_prive" ~ "Prise en charge prive",
+        intervention == "Tpip" ~ "TPIp",
+        intervention == "vacc" ~ "Vaccin",
+        intervention == "mii_routine" ~ "Routine MII",
+        intervention == "mii_campagne" ~ "Campagne MII",
+        intervention == "cps" ~ "CPS",
+        intervention == "cpp" ~ "CPP",
+        intervention == "pier" ~ "Pulvérisation Intracommunautaire",
+        intervention == "ggl" ~ "GGL",
+        TRUE ~ intervention
+      ))
   })
 
   observe({
@@ -146,142 +149,49 @@ tab2Server <- function(input, output, session, shared) {
   active_intervention <- reactiveVal()
 
   # Update active intervention when tab changes
-  observeEvent(input$intervention_navset, {
-    req(data_available())
-    active_intervention(input$intervention_navset)
-  }, ignoreInit = TRUE)
+  observeEvent(input$intervention_navset,
+    {
+      req(data_available())
+      active_intervention(input$intervention_navset)
+    },
+    ignoreInit = TRUE
+  )
 
   # Set default active intervention when interventions list changes
   observeEvent(interventions(), {
     req(data_available())
-    if(length(interventions()) > 0 && is.null(active_intervention())) {
+    if (length(interventions()) > 0 && is.null(active_intervention())) {
       active_intervention(interventions()[1])
     }
   })
-
-
-  # # Check for SMC and PMC overlap
-  # smc_pmc_overlap <- reactive({
-  #   req(data_available(), input$plan_select, input$year_select)
-  #
-  #   year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-  #     unique(scenario_uploads()$year)
-  #   } else {
-  #     input$year_select
-  #   }
-  #
-  #   # Which LGAs are receiving PMC each year
-  #   pmc_tmp <- filtered_data() %>%
-  #     filter(
-  #       intervention == "PMC",
-  #       included == 1
-  #     ) %>%
-  #     distinct(year, state, lga)
-  #
-  #   # Apply year filter if provided
-  #   if (!is.null(year_filter) && length(year_filter) > 0) {
-  #     pmc_tmp <-
-  #       pmc_tmp %>%
-  #       filter(year %in% year_filter)
-  #   }
-  #
-  #   # Which LGAs are receiving SMC each year
-  #   smc_tmp <-
-  #     filter(
-  #       intervention == "SMC",
-  #       included == 1
-  #     ) %>%
-  #     distinct(year, state, lga)
-  #
-  #   # Apply year filter if provided
-  #   if (!is.null(year_filter) && length(year_filter) > 0) {
-  #     smc_tmp <- smc_tmp %>%
-  #       filter(year %in% year_filter)
-  #   }
-  #
-  #   # Complete join by year, state, and lga
-  #   smc_pmc <- inner_join(pmc_tmp, smc_tmp, by = c("year", "state", "lga")) %>%
-  #     select(year, state, lga)
-  #
-  #   # If none, return NULL, otherwise return overlap data
-  #   if (nrow(smc_pmc) == 0) {
-  #     NULL
-  #   } else {
-  #     smc_pmc
-  #   }
-  # })
-
-  # Generate warning if SMC and PMC overlap
-  # output$smc_pmc_warning <- renderUI({
-  #   req(data_available())
-  #   overlap_data <- smc_pmc_overlap()
-  #
-  #   if (!is.null(overlap_data) && nrow(overlap_data) > 0) {
-  #     # Create a formatted table of the overlapping areas
-  #     overlap_html <- overlap_data %>%
-  #       arrange(year, state, lga) %>%
-  #       mutate(
-  #         display_text = paste0(year, ": ", state, " - ", lga)
-  #       ) %>%
-  #       pull(display_text) %>%
-  #       paste(collapse = ", ")
-  #
-  #     # Display warning message with the overlapping areas
-  #     card(
-  #       card_header(
-  #         class = "bg-warning text-white",
-  #         tags$div(
-  #           class = "d-flex align-items-center",
-  #           bsicons::bs_icon("exclamation-triangle-fill", size = "1.5rem", class = "me-2"),
-  #           "Warning: PMC and SMC Overlap Detected"
-  #         )
-  #       ),
-  #       card_body(
-  #         tags$div(
-  #           tags$p("The following LGAs have both PMC and SMC interventions scheduled for the same year. This may be unintended and should be reviewed:"),
-  #           tags$div(style = "max-height: 150px; overflow-y: auto;",
-  #                    tags$p(HTML(overlap_html))
-  #           )
-  #         )
-  #       )
-  #     )
-  #   } else {
-  #     # No overlap, don't display anything
-  #     NULL
-  #   }
-  # })
 
   # Generate tabs for each intervention
   output$intervention_tabs <- renderUI({
     req(data_available(), interventions())
 
-    if(length(interventions()) == 0) {
+    if (length(interventions()) == 0) {
       return(card(
-        card_header("No Data"),
-        "No interventions found for the selected plan. Please select a different plan."
+        card_header("Aucune donnée"),
+        "Aucune intervention trouvée pour le forfait sélectionné. Veuillez sélectionner un autre forfait."
       ))
     }
 
     # Get year filter once for all interventions
-    year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-      unique(scenario_uploads()$year)
-    } else {
-      input$year_select
-    }
+    year_filter <- input$year_select
 
     # Create the tab panels with value boxes embedded in each
     intervention_panels <- lapply(interventions(), function(intervention) {
       # Get coverage data for this specific intervention
-      coverage_data <- count_lga_coverage(
+      coverage_data <- count_adm2_coverage(
         intervention = intervention,
         plan = input$plan_select,
         year_filter = year_filter,
         data = filtered_data()
       )
 
-      # Calculate states with full, partial, and no coverage for this specific intervention
-      states_by_coverage <- coverage_data %>%
-        group_by(State) %>%
+      # Calculate adm1 with full, partial, and no coverage for this specific intervention
+      adm1_by_coverage <- coverage_data %>%
+        group_by(Province) %>%
         summarize(
           min_coverage = min(`Coverage %`),
           max_coverage = max(`Coverage %`),
@@ -295,8 +205,8 @@ tab2Server <- function(input, output, session, shared) {
           )
         )
 
-      # Count states by coverage status
-      summary_counts <- states_by_coverage %>%
+      # Count adm1 by coverage status
+      summary_counts <- adm1_by_coverage %>%
         group_by(coverage_status) %>%
         summarise(count = n())
 
@@ -307,20 +217,20 @@ tab2Server <- function(input, output, session, shared) {
         none_count = summary_counts %>% filter(coverage_status == "none") %>% pull(count) %>% as.integer()
       )
 
-      # Handle NAs for states that don't exist in a category
-      if(length(summary_list$full_count) == 0) summary_list$full_count <- 0
-      if(length(summary_list$partial_count) == 0) summary_list$partial_count <- 0
-      if(length(summary_list$none_count) == 0) summary_list$none_count <- 0
+      # Handle NAs for adm1 that don't exist in a category
+      if (length(summary_list$full_count) == 0) summary_list$full_count <- 0
+      if (length(summary_list$partial_count) == 0) summary_list$partial_count <- 0
+      if (length(summary_list$none_count) == 0) summary_list$none_count <- 0
 
       # Create nav panel with value boxes specific to this intervention
       nav_panel(
         title = intervention,
         # Value boxes for this specific intervention
         layout_column_wrap(
-          width = 1/3,
-          value_box("States with Full Coverage", summary_list$full_count, showcase = bsicons::bs_icon("check-circle-fill"), theme = "success"),
-          value_box("States with Partial Coverage", summary_list$partial_count, showcase = bsicons::bs_icon("dash-circle-fill"), theme = "warning"),
-          value_box("States with No Coverage", summary_list$none_count, showcase = bsicons::bs_icon("x-circle-fill"), theme = "danger")
+          width = 1 / 3,
+          value_box("Provinces avec couverture complète", summary_list$full_count, showcase = bsicons::bs_icon("check-circle-fill"), theme = "teal"),
+          value_box("Provinces avec couverture partielle", summary_list$partial_count, showcase = bsicons::bs_icon("dash-circle-fill"), theme = "yellow"),
+          value_box("Provinces sans couverture", summary_list$none_count, showcase = bsicons::bs_icon("x-circle-fill"), theme = "red")
         ),
         DTOutput(ns(paste0("coverage_table_", make.names(intervention))))
       )
@@ -328,21 +238,14 @@ tab2Server <- function(input, output, session, shared) {
 
     # Only create the card if we have intervention panels
     if (length(intervention_panels) > 0) {
-      card(
-        full_screen = TRUE,
-        height = 900,
-        card_header(paste0("LGA Coverage for Plan: ", input$plan_select)),
-        card_body(
-          do.call(navset_card_tab, c(
-            list(id = ns("intervention_navset")),
-            intervention_panels
-          ))
-        )
-      )
+      do.call(navset_card_tab, c(
+        list(id = ns("intervention_navset")),
+        intervention_panels
+      ))
     } else {
       card(
-        card_header("No Interventions"),
-        card_body("No interventions found for the selected criteria.")
+        # card_header("Aucune intervention"),
+        card_body("Aucune intervention trouvée pour les critères sélectionnés.")
       )
     }
   })
@@ -351,7 +254,7 @@ tab2Server <- function(input, output, session, shared) {
   observe({
     req(data_available(), interventions(), input$plan_select)
 
-    for(intervention in interventions()) {
+    for (intervention in interventions()) {
       local({
         local_intervention <- intervention
         output_id <- paste0("coverage_table_", make.names(local_intervention))
@@ -360,14 +263,10 @@ tab2Server <- function(input, output, session, shared) {
           req(input$plan_select)
 
           # Get year filter
-          year_filter <- if (input$year_select == "All Years" || input$year_select == "") {
-            unique(scenario_uploads()$year)
-          } else {
-            input$year_select
-          }
+          year_filter <- input$year_select
 
-          # Get the data from the count_lga_coverage function
-          data_table <- count_lga_coverage(
+          # Get the data from the count_adm2_coverage function
+          data_table <- count_adm2_coverage(
             intervention = local_intervention,
             plan = input$plan_select,
             year_filter = year_filter,
@@ -379,29 +278,33 @@ tab2Server <- function(input, output, session, shared) {
             data_table,
             options = list(
               pageLength = 10,
-              dom = 'lfrtip',
-              lengthMenu = list(c(10, 25, 50, -1), c('10', '25', '50', 'All')),
+              dom = "lfrtip",
+              lengthMenu = list(c(10, 25, 50, -1), c("10", "25", "50", "All")),
               autoWidth = TRUE,
               scrollX = TRUE,
               searchHighlight = TRUE,
-              search = list(regex = TRUE, caseInsensitive = TRUE)
+              search = list(regex = TRUE, caseInsensitive = TRUE),
+              language = list(
+                url = "https://cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json"
+              )
             ),
             rownames = FALSE,
-            filter = 'top',
-            class = 'cell-border stripe'
+            colnames = c("Année", "Province", "Totale zone de sante", "Couverte", "Non couverte", "Couverture (%)"),
+            filter = "top",
+            class = "cell-border stripe"
           ) %>%
             formatStyle(
-              'Coverage %',
+              "Coverage %",
               background = styleColorBar(
                 range(0, 100),
-                '#78c2ad'
+                "#78c2ad"
               ),
-              backgroundSize = '100% 90%',
-              backgroundRepeat = 'no-repeat',
-              backgroundPosition = 'center'
+              backgroundSize = "100% 90%",
+              backgroundRepeat = "no-repeat",
+              backgroundPosition = "center"
             ) %>%
             formatRound(
-              c('Coverage %'),
+              c("Coverage %"),
               digits = 1
             )
         })
@@ -415,5 +318,3 @@ tab2Server <- function(input, output, session, shared) {
     updateSelectInput(session, "year_select", selected = "")
   })
 }
-
-
