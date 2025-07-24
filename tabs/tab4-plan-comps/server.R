@@ -53,7 +53,7 @@ tab4Server <- function(input, output, session,
   # Plan selection UI
   output$plan_bl_select_ui <- renderUI({
     plans <- available_plans()
-    selectInput(ns("plan_bl_select"), "Sélectionnez le plan principal:",
+    selectInput(ns("plan_bl_select"), "Sélectionnez le budget principal:",
       choices = c("", plans$plan_id),
       selected = ""
     )
@@ -65,7 +65,7 @@ tab4Server <- function(input, output, session,
     remaining <- setdiff(plans$plan_id, input$plan_bl_select)
     checkboxGroupInput(
       ns("remaining_plan_select"),
-      "Sélectionnez les plans à comparer:",
+      "Sélectionner des budgets de comparaison:",
       choices = remaining
     )
   })
@@ -110,24 +110,30 @@ tab4Server <- function(input, output, session,
     return(data)
   })
 
-  # Description UI
   output$page_description <- renderUI({
-    if (is.null(input$plan_bl_select) || input$plan_bl_select == "") {
-      return(HTML("<p>Sélectionnez un plan de base pour commencer les comparaisons.</p>"))
-    }
-    if (is.null(input$remaining_plan_select) || length(input$remaining_plan_select) == 0) {
-      return(HTML(paste0(
+    # Generate the card content based on the state of the inputs
+    content <- if (is.null(input$plan_bl_select) || input$plan_bl_select == "") {
+      HTML("<p>Sélectionnez budget principal pour commencer les comparaisons.</p>")
+    } else if (is.null(input$remaining_plan_select) || length(input$remaining_plan_select) == 0) {
+      HTML(paste0(
         "<p>Plan principal défini comme: <b>",
         input$plan_bl_select,
         "</b>. Sélectionnez un ou plusieurs plans à comparer.</p>"
-      )))
+      ))
+    } else {
+      HTML(paste0(
+        "<div style='font-size:14px;'>",
+        "<b>Budget principal défini comme: </b> ", input$plan_bl_select, "<br><br>",
+        "<b>Budget(s) de comparaison défini(s) comme: </b><br>",
+        paste(input$remaining_plan_select, collapse = "<br>"),
+        "</div>"
+      ))
     }
-    HTML(paste0(
-      "<div style='font-size:14px;'>",
-      "<b>Plan principal défini comme: </b> ", input$plan_bl_select, "<br><br>",
-      "<b>Plan(s) de comparaison défini(s) comme: </b><br>",
-      paste(input$remaining_plan_select, collapse = "<br>")
-    ))
+
+    card(
+      card_header("Informations de sélection"),
+      card_body(content)
+    )
   })
 
   #-BUDGET COMPARISON PLOTS------------------------------------------------------------------
@@ -205,14 +211,11 @@ tab4Server <- function(input, output, session,
 
   # UI components for cost data-------------------------------
   output$budget_comps <- renderUI({
-    req(
-      input$plan_bl_select != "", input$remaining_plan_select != "",
-      input$year_select != "", input$currency_select != ""
-    )
     # plot card
     card(
       card_header("Comparaisons budgétaires"),
       full_screen = TRUE,
+      min_height = 450,
       # style = "resize: vertical; overflow: auto; min-height: 300px; max-height: 800px;",
       card_body( # use card_body_fill instead of card_body
         layout_column_wrap(
@@ -228,9 +231,11 @@ tab4Server <- function(input, output, session,
 
   #-Plot one bar chart of total budget--------------------------
   output$budget_comp_chart <- renderPlotly({
-    req(
-      input$plan_bl_select != "", input$remaining_plan_select != "",
-      input$year_select != "", input$currency_select != ""
+    validate(
+      need(input$plan_bl_select != "", "Sélectionnez un plan principal."),
+      need(input$remaining_plan_select != "", "Sélectionnez des plans de comparaison."),
+      need(input$year_select != "", "Sélectionnez une année."),
+      need(input$currency_select != "", "Sélectionnez une devise.")
     )
 
     budget_barchart(
@@ -241,10 +246,12 @@ tab4Server <- function(input, output, session,
 
   #-plot two cost difference plot--------------------------------
   output$budget_diff_chart <- renderPlotly({
-    req(
-      input$plan_bl_select != "", input$remaining_plan_select != "",
-      input$year_select != "", input$currency_select != ""
-    )
+    req(input$plan_bl_select != "",
+        input$remaining_plan_select != "",
+        input$year_select != "",
+        input$currency_select != ""
+        )
+
 
     budget_diff_chart(
       prepare_diff_data(),
@@ -257,8 +264,6 @@ tab4Server <- function(input, output, session,
   # ------------------------------------------------------------------------------
 
   output$budget_tables <- renderUI({
-    req(input$plan_bl_select, input$year_select, input$currency_select)
-
     card(
       card_header("Tableau récapitulatif du budget de base"),
       card_body(
@@ -272,7 +277,12 @@ tab4Server <- function(input, output, session,
   # ------------------------------------------------------------------------------
 
   output$budget_table <- DT::renderDataTable({
-    req(input$plan_bl_select, input$year_select, input$currency_select)
+    validate(
+      need(input$plan_bl_select != "", "Sélectionnez un plan principal."),
+      need(input$year_select != "", "Sélectionnez une année."),
+      need(input$currency_select != "", "Sélectionnez une devise.")
+    )
+
     create_budget_table(
       process_budget_data( # Process baseline plan data at national level
         spatial_scale = "National",
@@ -359,6 +369,12 @@ tab4Server <- function(input, output, session,
     combined_comp <- bind_rows(all_comp_processed, .id = "plan_id") # Add plan label to each row
 
     output$final_cost_plot <- renderPlotly({
+      validate(
+        need(input$plan_bl_select != "", "Sélectionnez un plan principal."),
+        need(input$year_select != "", "Sélectionnez une année."),
+        need(input$currency_select != "", "Sélectionnez une devise.")
+      )
+
       generate_final_cost_plot(
         baseline_processed = baseline_processed,
         comparison_processed = combined_comp,
@@ -372,8 +388,6 @@ tab4Server <- function(input, output, session,
   # ------------------------------------------------------------------------------
 
   output$budget_item_plots <- renderUI({
-    req(input$plan_bl_select, input$remaining_plan_select, input$year_select, input$currency_select)
-
     card(
       full_screen = TRUE,
       card_header("Comparaisons des coûts des articles"),

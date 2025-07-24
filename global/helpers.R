@@ -256,37 +256,6 @@ create_icon_summaries <- function(spatial_scale, adm1_select, year_select,
 
   # Cards
   layout_column_wrap(
-    # width = 1 / 6,
-
-    # # 1. Total Population
-    # card(
-    #   card_header(tagList(icon("users", class = "fa-2x"), " Population totale")),
-    #   card_body(
-    #     h3(formatC(pop_data$pop_total, format = "f", digits = 0, big.mark = ","), style = "font-weight: bold;"),
-    #     p("Personnes")
-    #   ),
-    #   class = "bg-info text-white"
-    # ),
-    #
-    # # 2. Under 5
-    # card(
-    #   card_header(tagList(icon("child", class = "fa-2x"), " Population <5 ans")),
-    #   card_body(
-    #     h3(formatC(pop_data$pop_0_5, format = "d", big.mark = ","), style = "font-weight: bold;"),
-    #     p("Moins de 5 ans")
-    #   ),
-    #   class = "bg-success text-white"
-    # ),
-    #
-    # # 3. Pregnant Women
-    # card(
-    #   card_header(tagList(icon("female", class = "fa-2x"), " Femmes enceintes")),
-    #   card_body(
-    #     h3(formatC(pop_data$pop_femme_enceinte, format = "d", big.mark = ","), style = "font-weight: bold;"),
-    #     p("Femmes")
-    #   ),
-    #   class = "bg-warning text-white"
-    # ),
 
     # 4. Budget Total
     card(
@@ -310,19 +279,6 @@ create_icon_summaries <- function(spatial_scale, adm1_select, year_select,
       ),
       class = "bg-info text-dark"
     ),
-
-    # # 6. Budget Envelope Input (only if all years)
-    # if (show_budget_input) {
-    #   card(
-    #     card_header(tagList(icon("hand-holding-usd", class = "fa-2x"), " Saisir le budget disponible")),
-    #     card_body(
-    #       numericInput(ns("available_budget"), "Budget disponible", value = NULL, min = 0),
-    #       selectInput(ns("available_currency"), "Devise", choices = c("USD", "CDF"), selected = currency_select),
-    #       helpText("⚠️ Disponible uniquement si «Toutes les années» est sélectionné.")
-    #     ),
-    #     class = "bg-light"
-    #   )
-    # },
 
     # 7. Budget Comparison (only after input)
     if (show_budget_comparison) {

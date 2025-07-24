@@ -869,10 +869,10 @@ tab1aServer <- function(input, output, session,
     dbDisconnect(db)
   })
 
-  # Adding instructions pop up
-  observeEvent(input$show_instructions, {
+  # Adding instructions pop up - scenario template
+  observeEvent(input$show_instructions_sc, {
     showModal(modalDialog(
-      title = "Instructions détaillées pour le téléchargement de modèles",
+      title = "Instructions détaillées pour télécharger et compléter les modèles",
       easyClose = TRUE,
       size = "l",
       footer = modalButton("Fermer"),
@@ -909,7 +909,21 @@ tab1aServer <- function(input, output, session,
         p("Revenez à l'application Web et téléchargez le fichier Excel complété à l'aide du bouton Télécharger."),
         p("Donnez au scénario un nom abrégé : par exemple Plan 1 BAU et une description : par exemple « Interventions simples - campagnes de masse, distribution de routine et CPP minimal » – assurez-vous qu'il s'agit de descriptions informatives, car elles seront utiles lors de la comparaison des plans."),
         p("Appuyez sur le bouton « Soumettre le scénario » et la feuille de calcul sera téléchargée dans l'outil. Les plans téléchargés apparaîtront dans un tableau récapitulatif avec les détails associés."),
-        tags$b("2. Définition des coûts unitaires:"),
+        tags$b("2. Données précédentes téléchargées :"),
+        p("Une fois qu'une feuille de calcul a été téléchargée dans l'outil, l'utilisateur est capable de télécharger un modèle basé sur un scénario spécifique téléchargé - cela peut faciliter le remplissage rapide d'un nouveau scénario sans avoir à répliquer chaque élément, mais assurez-vous de saisir un nouveau nom et une nouvelle description de scénario lors du rechargement.")
+      )
+    ))
+  })
+
+  # instructions pop up unit costs
+  observeEvent(input$show_instructions_uc, {
+    showModal(modalDialog(
+      title = "Instructions détaillées pour télécharger et compléter les modèles",
+      easyClose = TRUE,
+      size = "l",
+      footer = modalButton("Fermer"),
+      tagList(
+        tags$b("1. Définition des coûts unitaires:"),
         p("Cliquez sur « Télécharger le modèle de coût vide »."),
         p("Assurez-vous que les en-têtes de colonne des colonnes A : J restent inchangés et que des colonnes supplémentaires peuvent être ajoutées selon les besoins de l'utilisateur."),
         p("Des feuilles supplémentaires pour le suivi des calculs de coûts unitaires, par exemple, peuvent également être ajoutées librement."),
@@ -949,29 +963,9 @@ tab1aServer <- function(input, output, session,
         p("Une fois que les données de coût unitaire ont été spécifiées, l'utilisateur peut enregistrer une copie locale de ce fichier."),
         p("Revenez à l'application Web et téléchargez le fichier Excel complété à l'aide du formulaire et donnez à la feuille de coûts un nom : par exemple « Coût 1 », etc. et une description : par exemple « Basé sur les données de coûts historiques » – assurez-vous qu'il s'agit de descriptions informatives car elles seront utiles lors de la génération et de la comparaison des plans."),
         p("Appuyez sur le bouton « Soumettre la feuille de coûts » et la feuille de calcul sera téléchargée dans l'outil."),
-        p("Les données de coût téléchargées apparaîtront dans un tableau récapitulatif."),
-        tags$b("3. Données précédentes téléchargées :"),
+        tags$b("2. Données précédentes téléchargées :"),
         p("Une fois qu'une feuille de calcul a été téléchargée dans l'outil, l'utilisateur est capable de télécharger un modèle basé sur un scénario spécifique téléchargé - cela peut faciliter le remplissage rapide d'un nouveau scénario sans avoir à répliquer chaque élément, mais assurez-vous de saisir un nouveau nom et une nouvelle description de scénario lors du rechargement.")
       )
     ))
   })
-
-  # # returning the data as a reactive list for future data processing
-  # return(
-  #   list(
-  #     uploaded_scenarios = reactive({
-  #       db <- DBI::dbConnect(RSQLite::SQLite(), "scenario_uploads.db")
-  #       df <- dbReadTable(db, "uploads")
-  #       dbDisconnect(db)
-  #       df
-  #     }),
-  #     uploaded_costs = reactive({
-  #       db <- DBI::dbConnect(RSQLite::SQLite(), "cost_uploads.db")
-  #       df <- dbReadTable(db, "uploads")
-  #       dbDisconnect(db)
-  #       df
-  #     })
-  #
-  #   )
-  # )
 }

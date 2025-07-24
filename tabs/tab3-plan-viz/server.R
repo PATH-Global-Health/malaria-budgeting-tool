@@ -242,7 +242,7 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
   # helper function for validation
   validate_plan_inputs <- function(input) {
     validate(
-      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$plan_select != "", "Veuillez sélectionner un budget"),
       need(input$year_select != "", "Veuillez sélectionner une année."),
       need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale.")
     )
@@ -302,78 +302,74 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   #-Adding plan description-----------------------------------------------------------------
   output$page_description <- renderUI({
-    validate_plan_inputs(input)
+    card(
+      card_header("Informations de sélection"),
+      card_body({
+        # Show a placeholder if required inputs are missing
+        if (input$plan_select == "" || input$year_select == "" || input$spatial_scale == "") {
+          HTML("<p><em>Aucune sélection valide n’a été effectuée. Veuillez compléter les sélections ci-dessus.</em></p>")
+        } else {
+          req(filtered_budget())  # Ensure data is ready
 
-    req(filtered_budget()) # Make sure filtered budget data is available
+          # Extract descriptions
+          plan_desc <- if ("scenario_description" %in% colnames(filtered_budget())) {
+            unique(filtered_budget()$scenario_description)
+          } else {
+            selected_plan_details()$scenario
+          }
 
-    # Check if scenario_description column exists and get scenario description
-    if ("scenario_description" %in% colnames(filtered_budget())) {
-      plan_desc <- filtered_budget() %>%
-        pull(scenario_description) %>%
-        unique()
-    } else {
-      # Fallback to scenario_name if description isn't available
-      plan_desc <- selected_plan_details()$scenario
-    }
+          cost_desc <- if ("cost_description" %in% colnames(filtered_budget())) {
+            unique(filtered_budget()$cost_description)
+          } else {
+            selected_plan_details()$cost
+          }
 
-    # Check if cost_description column exists and get cost description
-    if ("cost_description" %in% colnames(filtered_budget())) {
-      cost_desc <- filtered_budget() %>%
-        pull(cost_description) %>%
-        unique()
-    } else {
-      # Fallback to cost_name if description isn't available
-      cost_desc <- selected_plan_details()$cost
-    }
+          assum_desc <- if ("assumptions_changes" %in% colnames(filtered_budget())) {
+            unique(filtered_budget()$assumptions_changes)
+          } else {
+            NULL
+          }
 
+          if (length(plan_desc) == 0) plan_desc <- "Aucune description disponible"
+          if (length(cost_desc) == 0) cost_desc <- "Aucune description des coûts disponible"
+          if (length(assum_desc) == 0) assum_desc <- "Aucune modification d'hypothèse disponible"
 
-    # Check if assumptions_changes column exists and get cost description
-    if ("assumptions_changes" %in% colnames(filtered_budget())) {
-      assum_desc <- filtered_budget() %>%
-        pull(assumptions_changes) %>%
-        unique()
-    } else {
-      # Fallback to cost_name if description isn't available
-      assum_desc <- NULL
-    }
+          # Build description
+          description <- paste0(
+            "<p><strong>Affichage des résultats pour ", input$plan_select,
+            " au ", input$spatial_scale, " niveau pour l'année: ", input$year_select, "</strong></p>"
+          )
 
-    if (length(plan_desc) == 0) plan_desc <- "Aucune description disponible"
-    if (length(cost_desc) == 0) cost_desc <- "Aucune description des coûts disponible"
-    if (length(assum_desc) == 0) assum_desc <- "Aucune modification d'hypothèse disponible"
+          if (input$spatial_scale == "Province" && nzchar(input$adm1_select)) {
+            description <- paste0(description, "<p><strong>Province:</strong> ", input$adm1_select, "</p>")
+          }
 
-    # Build the description HTML
-    description <- paste0(
-      "<p><strong>Affichage des résultats pour ", input$plan_select,
-      " au ", input$spatial_scale, " niveau pour l'année: ", input$year_select, "</strong></p>"
+          if (input$spatial_scale == "Zone de santé" &&
+              nzchar(input$adm1_select) && nzchar(input$adm2_select)) {
+            description <- paste0(
+              description,
+              "<p><strong>Province:</strong> ", input$adm1_select,
+              " | <strong>Zone de santé:</strong> ", input$adm2_select, "</p>"
+            )
+          }
+
+          description <- paste0(
+            description,
+            "<p><strong>Description du plan:</strong> ", plan_desc, "</p>",
+            "<p><strong>Description des coûts:</strong> ", cost_desc, "</p>",
+            "<p><strong>Description modification d'hypothèse:</strong> ", assum_desc, "</p>"
+          )
+
+          HTML(description)
+        }
+      })
     )
-
-    if (input$spatial_scale == "Province" && !is.null(input$adm1_select) && input$adm1_select != "") {
-      description <- paste0(description, "<p><strong>Province:</strong> ", input$adm1_select, "</p>")
-    }
-
-    if (input$spatial_scale == "Zone de santé" && !is.null(input$adm1_select) && input$adm1_select != "" &&
-      !is.null(input$adm2_select) && input$adm2_select != "") {
-      description <- paste0(
-        description, "<p><strong>Province:</strong> ", input$adm1_select,
-        " | <strong>Zone de santé:</strong> ", input$adm2_select, "</p>"
-      )
-    }
-
-    # Add plan + cost + assumptions
-    description <- paste0(
-      description,
-      "<p><strong>Description du plan:</strong> ", plan_desc, "</p>",
-      "<p><strong>Description des coûts:</strong> ", cost_desc, "</p>",
-      "<p><strong>Description modification d'hypothèse:</strong> ", assum_desc, "</p>"
-    )
-
-    HTML(description)
   })
 
 
   #-Generate the interactive map-----------------------------------------------------------
   output$interactive_map <- renderLeaflet({
-    req(input$plan_select, input$spatial_scale) # Wait until a spatial scale is chosen
+    validate_plan_inputs(input) # Wait until a spatial scale is chosen
 
     if (input$spatial_scale == "Province") {
       req(input$plan_select, input$adm1_select)
@@ -397,7 +393,7 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
   #-Generate the static maps-----------------------------------------------------
   # Single static map plot
   output$static_map_plot <- renderPlot({
-    req(input$plan_select)
+    validate_plan_inputs(input)
     req(filtered_budget())
 
     # Decide whether to filter by year or aggregate
@@ -427,10 +423,7 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   #-Show Maps UI when Plan & Year are selected------------------------------------------
   output$maps_ui <- renderUI({
-    req(input$plan_select != "")
-
     layout_column_wrap(
-      # width = 1 / 2, # Two columns, each taking 50% width
 
       # INTERACTIVE MAP CARD
       card(
@@ -464,7 +457,7 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
   output$value_boxes <- renderUI({
     req(input$currency_select, input$plan_select, input$year_select, input$spatial_scale)
 
-    create_icon_summaries(
+      create_icon_summaries(
       spatial_scale = input$spatial_scale,
       adm1_select = input$adm1_select,
       adm2_select = input$adm2_select,
@@ -473,7 +466,7 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
       available_budget = input$available_budget,
       data = filtered_budget(),
       target_population = target_population,
-      ns = session$ns # 👈 ensures namespacing works
+      ns = session$ns
     )
   })
 
@@ -481,7 +474,7 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   #-Budget table summaries-------------------------------------------------------------
   output$budget_table_card <- renderUI({
-    req(input$plan_select != "")
+
     card(
       card_header(
         "Tableau récapitulatif du budget"
@@ -493,7 +486,14 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
   })
 
   output$budget_table <- DT::renderDataTable({
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale."),
+      need(input$currency_select != "", "Veuillez sélectionnez une devise")
+    )
+
     # For spatial scales that require a state selection, ensure input$adm1_select exists
     if (input$spatial_scale %in% c("Province", "Zone de santé")) {
       req(input$adm1_select)
@@ -519,7 +519,12 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   #-Donut chart--------------------
   output$donut_chart <- renderBillboarder({
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale."),
+      need(input$currency_select != "", "Veuillez sélectionnez une devise")
+    )
     # For spatial scales that require a state selection, ensure input$adm1_select exists
     if (input$spatial_scale %in% c("Province", "Zone de santé")) {
       req(input$adm1_select)
@@ -540,33 +545,15 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
     )
   })
 
-  #-Treemap chart----------------------
-  # output$treemap_chart <- renderPlotly({
-  #   req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-  #   # For spatial scales that require a state selection, ensure input$adm1_select exists
-  #   if (input$spatial_scale %in% c("Province", "Zone de santé")) {
-  #     req(input$adm1_select)
-  #   }
-  #   # For LGA level, require an LGA selection
-  #   if (input$spatial_scale == "Zone de santé") {
-  #     req(input$adm2_select)
-  #   }
-  #
-  #   treemap_plot(
-  #     process_budget_data(
-  #       spatial_scale = input$spatial_scale,
-  #       adm1_select = input$adm1_select,
-  #       adm2_select = input$adm2_select,
-  #       currency_select = input$currency_select,
-  #       data = filtered_budget()
-  #     ),
-  #     currency_select = input$currency_select
-  #   )
-  # })
-
   #-Stacked bar chart---------------------
   output$stacked_barchart <- renderPlotly({
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale."),
+      need(input$currency_select != "", "Veuillez sélectionnez une devise")
+    )
+
     # For spatial scales that require a state selection, ensure input$adm1_select exists
     if (input$spatial_scale %in% c("Province", "Zone de santé")) {
       req(input$adm1_select)
@@ -589,9 +576,15 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
   })
 
   #-stacked % bar chart---------------------
-  output$stacked_prop <-
-    renderPlotly({
-      req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+  output$stacked_prop <- renderPlotly({
+
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale."),
+      need(input$currency_select != "", "Veuillez sélectionnez une devise")
+    )
+
       # For spatial scales that require a state selection, ensure input$adm1_select exists
       if (input$spatial_scale %in% c("Province", "Zone de santé")) {
         req(input$adm1_select)
@@ -615,7 +608,12 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   #-lolipop chart---------------------------
   output$lolipop_chart <- renderPlotly({
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale."),
+      need(input$currency_select != "", "Veuillez sélectionnez une devise")
+    )
     # For spatial scales that require a state selection, ensure input$adm1_select exists
     if (input$spatial_scale %in% c("Province", "Zone de santé")) {
       req(input$adm1_select)
@@ -639,7 +637,12 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   #-Map 1 - state total cost------------------
   output$adm1_total_map <- renderLeaflet({
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale."),
+      need(input$currency_select != "", "Veuillez sélectionnez une devise")
+    )
     if (input$spatial_scale %in% c("Province", "Zone de santé")) {
       req(input$adm1_select)
     }
@@ -655,7 +658,12 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   #-Map 2 - state pp cost------------------
   output$adm1_pp_map <- renderLeaflet({
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale."),
+      need(input$currency_select != "", "Veuillez sélectionnez une devise")
+    )
     if (input$spatial_scale %in% c("Province", "Zone de santé")) {
       req(input$adm1_select)
     }
@@ -671,7 +679,12 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   #-Map 3 - lga total cost------------------
   output$adm2_total_map <- renderLeaflet({
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale."),
+      need(input$currency_select != "", "Veuillez sélectionnez une devise")
+    )
     if (input$spatial_scale %in% c("Province", "Zone de santé")) {
       req(input$adm1_select)
     }
@@ -691,7 +704,12 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   #-Map 4 - lga pp cost------------------
   output$adm2_pp_map <- renderLeaflet({
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+    validate(
+      need(input$plan_select != "", "Veuillez sélectionner un plan."),
+      need(input$year_select != "", "Veuillez sélectionner une année."),
+      need(input$spatial_scale != "", "Veuillez sélectionner une échelle spatiale."),
+      need(input$currency_select != "", "Veuillez sélectionnez une devise")
+    )
     if (input$spatial_scale %in% c("Province", "Zone de santé")) {
       req(input$adm1_select)
     }
@@ -712,7 +730,6 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
 
   # #-PLOT ELEMENTS-------------------------------------------------------------------------
   output$cost_charts <- renderUI({
-    req(input$plan_select != "")
 
     layout_column_wrap(
       width = 1 / 3, # 3 columns

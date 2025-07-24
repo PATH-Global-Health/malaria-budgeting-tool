@@ -25,7 +25,7 @@ tab1aUI <- function(id) {
       .card-header {
       font-weight: bold;
     }
-  "))
+      "))
     ),
 
     # -------------------------------
@@ -36,35 +36,6 @@ tab1aUI <- function(id) {
       strong(head_bold),
       main_text
     ),
-    actionButton(ns("show_instructions"), "📘 Instructions détaillées", class = "btn-info"),
-
-    # # -------------------------------
-    # # Instructions upfront
-    # # -------------------------------
-    # card(
-    #   card_header("Instructions"),
-    #   layout_column_wrap(
-    #     card(
-    #       card_header("Cet outil vous aide à gérer à la fois les modèles de scénario et les modèles de coûts:"),
-    #       card_body(
-    #         tags$ul(
-    #           tags$li("Modèles de scénario : plusieurs feuilles (par année) pour les plans d'intervention"),
-    #           tags$li("Modèles de coûts : une seule feuille pour les informations sur les coûts unitaires")
-    #         )
-    #       )
-    #     ),
-    #     card(
-    #       card_header("Pour commencer avec l'un ou l'autre modèle :"),
-    #       card_body(
-    #         tags$ul(
-    #           tags$li("Téléchargez un modèle vide pour créer un nouveau fichier, ou"),
-    #           tags$li("Téléchargez un fichier existant à partir des tableaux ci-dessous")
-    #         )
-    #       )
-    #     )
-    #   ),
-    #
-    # ),
 
     # -------------------------------
     # Scenario Template Section
@@ -78,6 +49,9 @@ tab1aUI <- function(id) {
         # add the sidebar with input elements
         sidebar = sidebar(
           width = "400px",
+
+          # Instructions - scenarion template only
+          actionButton(ns("show_instructions_sc"), "📘 Instructions détaillées", class = "btn-info"),
 
           # Select the years of the plan
           selectInput(ns("year_filter"), "Sélectionnez les années d'intérêt :",
@@ -121,7 +95,11 @@ tab1aUI <- function(id) {
         # add the sidebar with input elements
         sidebar = sidebar(
           width = "400px",
-          downloadButton(ns("download_cost_template"), "Télécharger le modèle de coûts vide", class = "btn-primary", ),
+          # Instructions - scenarion template only
+          actionButton(ns("show_instructions_uc"), "📘 Instructions détaillées", class = "btn-info"),
+
+          # Download template
+          downloadButton(ns("download_cost_template"), "Télécharger le modèle de coûts vide", class = "btn-primary"),
           uiOutput(ns("cost_download_ui")),
           hr(),
           fileInput(ns("cost_file"), "Importer un fichier de coûts", accept = c(".xlsx", ".xls")) |>
