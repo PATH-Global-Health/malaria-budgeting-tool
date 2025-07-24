@@ -18,18 +18,21 @@ tab2aServer <- function(input, output, session, shared) {
       size = "l",
       footer = modalButton("Fermer"),
       tagList(
-        p("Cette section permet aux utilisateurs de générer des budgets d'intervention complets en combinant des plans précédemment téléchargés avec une feuille de coûts sélectionnée. L'outil calcule les budgets totaux en fonction de la combinaison d'interventions sélectionnée, de la population cible et des hypothèses budgétaires définies pour chaque intervention."),
-        tags$b("Étapes d'utilisation :"),
-        tags$ol(
-          tags$li("📝 Sélectionnez un ou plusieurs plans d’intervention dans la liste déroulante."),
-          tags$li("💵 Sélectionnez une feuille de coûts dans la liste déroulante."),
-          tags$li("📐 Sélectionnez les hypothèses de quantification budgétaire pour chaque intervention."),
-          tags$li("Sélectionnez l’hypothèse de tampon d’approvisionnement à utiliser."),
-          tags$li("⚠️ Vérifiez et confirmez vos sélections. Dans le cas contraire, l'outil signalera les données manquantes."),
-          tags$li("⚙️ Cliquez sur le bouton « Générer des budgets »."),
-          tags$li("⏳ Attendez le message de confirmation. Les données budgétaires générées apparaîtront sous les onglets « Visualisation du plan » et « Comparaison du plan ».")
+        p("Pour combiner ensuite les entrées de coût opérationnel et unitaire afin de générer un budget, l'utilisateur se déplace dans l'onglet Générer un budget."),
+        p("Avant de générer des budgets, vous trouverez des informations détaillées sur la méthodologie sous-jacente dans l'  onglet Méthodes - veuillez consulter ces données avant de générer des budgets - si la méthodologie actuelle doit être mise à jour, veuillez contacter l'équipe d'assistance technique de PATH pour corriger cela."),
+        p("En bref, l'outil quantifiera les produits nécessaires à chaque intervention en fonction de la population cible d'une zone de santé. Une fois les besoins en matières premières quantifiés, ils peuvent être multipliés par le coût unitaire correspondant pour obtenir le coût global final de l'intervention."),
+        p("Pour configurer l'outil de calcul des budgets, spécifiez d'abord les combinaisons de sources de données dans la matrice de spécification :"),
+        tags$ul(
+          tags$li("Sélectionnez une spécification de plan dans le menu déroulant."),
+          tags$li("Sélectionnez une spécification de coût dans le menu déroulant."),
+          tags$li("Décidez si les hypothèses de base utilisées pour les calculs budgétaires sont acceptables ou si vous souhaitez ajuster l'une ou l'autre des hypothèses."),
+          tags$li("En cas d'ajustement, sélectionnez l'hypothèse spécifique dans la liste déroulante et spécifiez une nouvelle valeur spécifique et cliquez sur « ajouter l'ajustement » pour finaliser le changement. Si vous souhaitez supprimer cette modification, il vous suffit de cliquer sur le petit « x » à côté de la valeur dans la colonne."),
+          tags$li("Plusieurs budgets peuvent être générés à la fois en ajoutant des lignes supplémentaires à la matrice de sélection."),
+          tags$li("Une fois que les sélections sont prêtes, cliquez sur le bouton « générer un budget » (s'il existe des lignes vides ou des lignes partiellement terminées, elles enverront un message d'erreur à l'utilisateur et seront mises en surbrillance afin que l'utilisateur puisse compléter ou supprimer ces lignes selon les besoins).")
         ),
-        p("📝 Conseil : Assurez-vous que votre feuille de coûts inclut les valeurs pour tous les types et sous-types d’intervention prévus pour une utilisation (par exemple, PBO par rapport aux moustiquaires standard, RTSS par rapport aux vaccins R21).")
+        p("L'outil fournira des messages d'état utiles sur le processus de génération et les données budgétaires générées apparaîtront dans le tableau à droite de la page."),
+        p("L'utilisateur a la possibilité de supprimer tous les budgets générés de ce tableau même s'ils ne l'intéressent plus."),
+        p("Une fois généré, le nouveau budget restera disponible dans l'outil jusqu'à ce qu'il soit supprimé, ce qui signifie qu'il n'est pas nécessaire de régénérer les budgets à chaque fois qu'un utilisateur accède à l'outil.")
       )
     ))
   })
@@ -140,7 +143,7 @@ tab2aServer <- function(input, output, session, shared) {
             )
           )
         ),
-        p(tags$em("Remarque : Toutes les hypothèses sont actuellement appliquées uniformément à toutes les zones géographiques. Des hypothèses propres à chaque province ou zone sanitaire pourront être intégrées dans les mises à jour futures.")),
+        p(tags$em("Remarque : Toutes les hypothèses sont actuellement appliquées uniformément à toutes les zones géographiques. Des hypothèses propres à chaque province ou zone sanitaire pourront être intégrées dans les mises à jour futures.")),
         p(tags$em("Consultez l’onglet Méthodes pour une description complète des calculs et des hypothèses pour chaque intervention."))
       )
     ))
@@ -387,44 +390,44 @@ tab2aServer <- function(input, output, session, shared) {
         }
         switch(param,
 
-               # Campagne MII
-               "Campagne MII : personnes par moustiquaire" = numericInput(ns(paste0("adj_val_", i)), "Nouveau nombre de personnes par moustiquaire :", 1.8, min = 1, step = 0.1),
-               "Campagne MII : population cible" = selectInput(ns(paste0("adj_val_", i)), "Nouvelle population cible :",
-                                                                 choices = c("Population totale", "Enfants de moins de 5 ans", "Enfants de moins de 5 ans et femmes enceintes", "Enfants de moins de 10 ans"), selected = "Population totale"
-               ),
-               "Campagne MII : couverture de la population cible" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 100),
-               "Campagne MII : moustiquaires par balle" = numericInput(ns(paste0("adj_val_", i)), "Nouveau nombre de moustiquaires par balle :", 50, min = 1, step = 1),
-               "Campagne MII : marge de moustiquaires (%)" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+          # Campagne MII
+          "Campagne MII : personnes par moustiquaire" = numericInput(ns(paste0("adj_val_", i)), "Nouveau nombre de personnes par moustiquaire :", 1.8, min = 1, step = 0.1),
+          "Campagne MII : population cible" = selectInput(ns(paste0("adj_val_", i)), "Nouvelle population cible :",
+            choices = c("Population totale", "Enfants de moins de 5 ans", "Enfants de moins de 5 ans et femmes enceintes", "Enfants de moins de 10 ans"), selected = "Population totale"
+          ),
+          "Campagne MII : couverture de la population cible" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 100),
+          "Campagne MII : moustiquaires par balle" = numericInput(ns(paste0("adj_val_", i)), "Nouveau nombre de moustiquaires par balle :", 50, min = 1, step = 1),
+          "Campagne MII : marge de moustiquaires (%)" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
 
-               # Routine MII
-               "Routine MII : population cible" = selectInput(ns(paste0("adj_val_", i)), "Nouvelle population cible :",
-                                                                   choices = c("Population totale", "Enfants de moins de 5 ans", "Enfants de moins de 5 ans et femmes enceintes", "Enfants de moins de 10 ans"), selected = "Enfants de moins de 5 ans et femmes enceintes"
-               ),
-               "Routine MII : couverture de la population cible" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 30),
-               "Routine MII : marge de moustiquaires (%)" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+          # Routine MII
+          "Routine MII : population cible" = selectInput(ns(paste0("adj_val_", i)), "Nouvelle population cible :",
+            choices = c("Population totale", "Enfants de moins de 5 ans", "Enfants de moins de 5 ans et femmes enceintes", "Enfants de moins de 10 ans"), selected = "Enfants de moins de 5 ans et femmes enceintes"
+          ),
+          "Routine MII : couverture de la population cible" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 30),
+          "Routine MII : marge de moustiquaires (%)" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
 
-               # TPIp
-               "TPIp : fréquentation CPN" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 80),
-               "TPIp : points de contact" = numericInput(ns(paste0("adj_val_", i)), "Nouveaux points de contact :", 3, min = 1),
-               "TPIp : marge pour l’approvisionnement en médicaments" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+          # TPIp
+          "TPIp : fréquentation CPN" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 80),
+          "TPIp : points de contact" = numericInput(ns(paste0("adj_val_", i)), "Nouveaux points de contact :", 3, min = 1),
+          "TPIp : marge pour l’approvisionnement en médicaments" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
 
-               # CPS
-               "CPS : population cible" = selectInput(ns(paste0("adj_val_", i)), "Nouvelle population cible :", choices = c("Enfants de 3 mois à 5 ans", "Enfants de 3 mois à 10 ans"), selected = "Enfants de 3 mois à 5 ans"),
-               "CPS : couverture de la population cible" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 100),
-               "CPS : cycles" = numericInput(ns(paste0("adj_val_", i)), "Nouveaux cycles :", 4, min = 1),
-               "CPS : ciblage par âge" = textInput(ns(paste0("adj_val_", i)), "Nouvelles proportions par âge :", "0.18,0.77"),
-               "CPS : marge pour l’approvisionnement en médicaments" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+          # CPS
+          "CPS : population cible" = selectInput(ns(paste0("adj_val_", i)), "Nouvelle population cible :", choices = c("Enfants de 3 mois à 5 ans", "Enfants de 3 mois à 10 ans"), selected = "Enfants de 3 mois à 5 ans"),
+          "CPS : couverture de la population cible" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 100),
+          "CPS : cycles" = numericInput(ns(paste0("adj_val_", i)), "Nouveaux cycles :", 4, min = 1),
+          "CPS : ciblage par âge" = textInput(ns(paste0("adj_val_", i)), "Nouvelles proportions par âge :", "0.18,0.77"),
+          "CPS : marge pour l’approvisionnement en médicaments" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
 
-               # CPP
-               "CPP : couverture" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 85),
-               "CPP : points de contact" = numericInput(ns(paste0("adj_val_", i)), "Nouveaux points de contact :", 4, min = 1),
-               "CPP : facteur de mise à l’échelle nutritionnelle" = sliderInput(ns(paste0("adj_val_", i)), "Nouveau facteur de mise à l’échelle nutritionnelle (%) :", 0, 100, 75),
-               "CPP : marge pour l’approvisionnement en médicaments" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
+          # CPP
+          "CPP : couverture" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 85),
+          "CPP : points de contact" = numericInput(ns(paste0("adj_val_", i)), "Nouveaux points de contact :", 4, min = 1),
+          "CPP : facteur de mise à l’échelle nutritionnelle" = sliderInput(ns(paste0("adj_val_", i)), "Nouveau facteur de mise à l’échelle nutritionnelle (%) :", 0, 100, 75),
+          "CPP : marge pour l’approvisionnement en médicaments" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10),
 
-               # Vaccination
-               "Vaccination : couverture" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 84),
-               "Vaccination : nombre de doses" = numericInput(ns(paste0("adj_val_", i)), "Nouveau nombre de doses :", 4, min = 1),
-               "Vaccination : marge pour l’approvisionnement" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10)
+          # Vaccination
+          "Vaccination : couverture" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle couverture (%) :", 0, 100, 84),
+          "Vaccination : nombre de doses" = numericInput(ns(paste0("adj_val_", i)), "Nouveau nombre de doses :", 4, min = 1),
+          "Vaccination : marge pour l’approvisionnement" = sliderInput(ns(paste0("adj_val_", i)), "Nouvelle marge (%) :", 0, 100, 10)
         )
       })
     })
@@ -488,28 +491,21 @@ tab2aServer <- function(input, output, session, shared) {
       output[[paste0("summary_inline_", i)]] <- renderUI({
         stored <- stored_selections()
         adj_list <- get_safe(stored$adjustments, i)
-        assumption_type <- get_safe(stored$assumptions, i)
 
         if (!is.null(adj_list) && length(adj_list) > 0) {
           tagList(
             tags$b("Ajustements:"),
             tags$ul(
-              lapply(seq_along(adj_list), function(j) {
+              lapply(adj_list, function(adj_text) {
+                # Generate a stable hash ID
+                hashed <- digest(paste(i, adj_text))
                 tags$li(
-                  paste(adj_list[[j]]),
-                  actionLink(ns(paste0("remove_adj_", i, "_", j)), icon("xmark", style = "color: #888;"), style = "margin-left:8px;"),
-                  title = "réinitialiser la variable à la base de référence"
+                  adj_text,
+                  actionLink(ns(paste0("remove_adj_", hashed)), icon("xmark", style = "color: #888;"), style = "margin-left:8px;", title = "réinitialiser la variable à la base de référence")
                 )
               })
             )
           )
-        } else if (assumption_type == "Accepter la base de référence") {
-          div(
-            style = "color: #666; font-style: italic;",
-            "🛈 Aucun ajustement n’a été effectué — les hypothèses par défaut seront utilisées."
-          )
-        } else {
-          NULL
         }
       })
     })
@@ -519,24 +515,27 @@ tab2aServer <- function(input, output, session, shared) {
   # REMOVE INDIVIDUAL ADJUSTMENTS
   # ----------------------------------------------------------------------------
   observe({
+    current <- stored_selections()
+
     lapply(1:row_count(), function(i) {
-      observe({
-        adj_list <- get_safe(stored_selections()$adjustments, i)
-        if (!is.null(adj_list)) {
-          lapply(seq_along(adj_list), function(j) {
-            observeEvent(input[[paste0("remove_adj_", i, "_", j)]],
-              {
-                current <- stored_selections()
-                if (!is.null(current$adjustments[[i]]) && length(current$adjustments[[i]]) >= j) {
-                  current$adjustments[[i]] <- current$adjustments[[i]][-j]
-                  stored_selections(current)
-                }
-              },
-              ignoreInit = TRUE
-            )
+      adj_list <- get_safe(current$adjustments, i)
+      if (!is.null(adj_list)) {
+        lapply(adj_list, function(adj_text) {
+          local({
+            ii <- i
+            text <- adj_text
+            hashed <- digest(paste(ii, text))
+            btn_id <- paste0("remove_adj_", hashed)
+
+            observeEvent(input[[btn_id]], {
+              updated <- stored_selections()
+              adj_vec <- updated$adjustments[[ii]]
+              updated$adjustments[[ii]] <- adj_vec[adj_vec != text]
+              stored_selections(updated)
+            }, ignoreInit = TRUE)
           })
-        }
-      })
+        })
+      }
     })
   })
 

@@ -8,8 +8,8 @@ tab4UI <- function(id) {
       main_text
     ),
     page_sidebar(
-      width = "400px",
-      sidebar = list(
+      sidebar = sidebar(
+        width = 300,
         # instructions pop up
         actionButton(ns("show_instructions"), "📘 Instructions détaillées", class = "btn-info"),
         uiOutput(ns("plan_bl_select_ui")),

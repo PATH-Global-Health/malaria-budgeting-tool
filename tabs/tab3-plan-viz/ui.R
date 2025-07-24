@@ -11,11 +11,10 @@ tab3UI <- function(id) {
     # 📦 Actual page layout with sidebar
     page_sidebar(
       # title = "Visualisations budgétaires",
-
-      sidebar = list(
+      sidebar = sidebar(
+        width = 300,
         # instructions pop up
         actionButton(ns("show_instructions"), "📘 Instructions détaillées", class = "btn-info"),
-
         actionButton(
           ns("reload_budget_data"),
           "Recharger les données budgétaires",

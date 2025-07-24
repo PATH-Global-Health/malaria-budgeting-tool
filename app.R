@@ -74,7 +74,7 @@ ui <- page_navbar(
   nav_panel("Aperçu", tab0UI("tab0")),
   nav_panel("Méthodes", tab6UI("tab6")),
   nav_panel("Entrées utilisateur", tab1aUI("tab1a")),
-  nav_panel("Scénario de vérification", tab2UI("tab2")),
+  nav_panel("Vérification des scénarios", tab2UI("tab2")),
   nav_panel("Générer des budgets", tab2aUI("tab2a")),
   nav_panel("Visualisation des budgets", tab3UI("tab3")),
   nav_panel("Comparaisons des budgets", tab4UI("tab4")),

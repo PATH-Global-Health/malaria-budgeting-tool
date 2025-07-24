@@ -10,18 +10,10 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
       size = "l",
       footer = modalButton("Fermer"),
       tagList(
-        p("Cette section permet aux utilisateurs de visualiser les résultats détaillés d'un plan budgétisé sélectionné. Elle comprend des cartes, des tableaux et des synthèses visuelles présentant la répartition spatiale, la répartition des coûts et le profil budgétaire global du plan d'intervention sélectionné."),
-        tags$b("Étapes d'utilisation :"),
-        tags$ol(
-          tags$li("🧾 Sélectionnez les entrées en haut de la page (plan, échelle, année, devise)."),
-          tags$li("🧭 Consultez la section Aperçu du plan."),
-          tags$li("🗺️ Explorez les cartes : Mix d'intervention complet et Intervention spécifique."),
-          tags$li("👥 Consultez les chiffres principaux de la population et du budget."),
-          tags$li("📋 Consultez le tableau récapitulatif du budget."),
-          tags$li("📈 Explorez les visualisations budgétaires par article, catégorie et géographie."),
-          tags$li("🔍 Utilisez des filtres et des outils interactifs. Survolez et utilisez les icônes ℹ️ pour obtenir des explications.")
-        ),
-        p("📝 Conseil : utilisez cet onglet pour vérifier la couverture des interventions dans toutes les zones géographiques et évaluer la concentration budgétaire par intervention ou par région avant de comparer les plans.")
+        p("Cette section permet aux utilisateurs d'afficher les résultats détaillés d'un plan budgétisé sélectionné. Il comprend des cartes, des tableaux et des résumés visuels montrant la distribution spatiale, la répartition des coûts et le profil budgétaire global du plan d'intervention sélectionné."),
+        p("Sélectionnez les entrées en haut de la page (budget d'intérêt, échelle spatiale, année et devise)."),
+        p("Lors de la consultation du budget pour les 3 années du CO-OP, une option de saisie supplémentaire est disponible pour l'utilisateur - enveloppe budgétaire disponible pour 3 ans - entrez cette valeur dans la devise correspondante et l'outil déterminera si le budget actuel dépasse (case rouge) ou s'il rentre dans (case verte) l'enveloppe disponible."),
+        p("Faites défiler les résultats restants pour mieux comprendre les différentes ventilations des coûts d'intervention et les facteurs de coût.")
       )
     ))
   })
@@ -444,38 +436,29 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
       card(
         full_screen = TRUE,
         card_header(
-          "Carte complète des mix d'interventions",
-          tooltip(
-            shiny::icon("info-circle"),
-            "La carte affiche toutes les interventions ciblées..."
-          )
+          "Carte complète des mix d'interventions"
         ),
         card_body(
           class = "p-0 d-flex align-items-stretch", # ensure no padding and flexible growth
           leafletOutput(session$ns("interactive_map")) # no height specified!
-        )
+        ),
+        card_footer(input$year_select)
       ),
 
       # Static Map Card
       card(
         full_screen = TRUE,
         card_header(
-          "Cartes spécifiques aux interventions",
-          tooltip(
-            shiny::icon("info-circle"),
-            "Les cartes présentent les interventions ciblées et leur type par année..."
-          )
+          "Cartes spécifiques aux interventions"
         ),
         card_body(
           class = "p-0",
-          withSpinner(plotOutput(session$ns("static_map_plot")))
-        )
+          (plotOutput(session$ns("static_map_plot")))
+        ),
+        card_footer(input$year_select)
       )
     )
   })
-
-
-
 
   #-Ribbon Icons------------------------------------------------------------------------
   output$value_boxes <- renderUI({
@@ -558,28 +541,28 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
   })
 
   #-Treemap chart----------------------
-  output$treemap_chart <- renderPlotly({
-    req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
-    # For spatial scales that require a state selection, ensure input$adm1_select exists
-    if (input$spatial_scale %in% c("Province", "Zone de santé")) {
-      req(input$adm1_select)
-    }
-    # For LGA level, require an LGA selection
-    if (input$spatial_scale == "Zone de santé") {
-      req(input$adm2_select)
-    }
-
-    treemap_plot(
-      process_budget_data(
-        spatial_scale = input$spatial_scale,
-        adm1_select = input$adm1_select,
-        adm2_select = input$adm2_select,
-        currency_select = input$currency_select,
-        data = filtered_budget()
-      ),
-      currency_select = input$currency_select
-    )
-  })
+  # output$treemap_chart <- renderPlotly({
+  #   req(input$plan_select, input$year_select, input$spatial_scale, input$currency_select)
+  #   # For spatial scales that require a state selection, ensure input$adm1_select exists
+  #   if (input$spatial_scale %in% c("Province", "Zone de santé")) {
+  #     req(input$adm1_select)
+  #   }
+  #   # For LGA level, require an LGA selection
+  #   if (input$spatial_scale == "Zone de santé") {
+  #     req(input$adm2_select)
+  #   }
+  #
+  #   treemap_plot(
+  #     process_budget_data(
+  #       spatial_scale = input$spatial_scale,
+  #       adm1_select = input$adm1_select,
+  #       adm2_select = input$adm2_select,
+  #       currency_select = input$currency_select,
+  #       data = filtered_budget()
+  #     ),
+  #     currency_select = input$currency_select
+  #   )
+  # })
 
   #-Stacked bar chart---------------------
   output$stacked_barchart <- renderPlotly({
@@ -740,55 +723,40 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
         title = "Résumés des coûts proportionnels",
         nav_panel(
           "1",
-          card_title("Proportion du budget total par poste"),
-          card_body(
-            class = "p-0",
-            withSpinner(billboarderOutput(session$ns("donut_chart")))
-          )
+          card_title("Proportion du budget total par intervention"),
+          billboarderOutput(session$ns("donut_chart"))
         ),
-        # nav_panel(
-        #   "Plot 2",
-        #   card_title("Treemap of Budget Items"),
-        #   card_body(
-        #     class = "p-0",
-        #     withSpinner(plotlyOutput(session$ns("treemap_chart")))
-        #   )
-        #
-        # ),
         nav_panel(
           shiny::icon("circle-info"),
-          markdown("La proportion de la contribution de chaque poste budgétaire au budget total est affichée à l'aide d'un graphique en anneau: survolez chaque section du graphique pour voir la contribution proportionnelle de ce poste (%).")
-        )
+          markdown("Passez la souris sur chaque section du graphique pour voir la contribution en pourcentage de chaque intervention au budget total")
+        ),
+        card_footer(input$year_select)
       ),
 
       # Card 2: Intervention Cost Breakdowns with 3 tabs
       navset_card_tab(
         full_screen = TRUE,
+        height = 450,
         title = "Résumés des coûts d'intervention",
         nav_panel(
           "1",
+          fill = TRUE,
           card_title("Répartition des coûts par catégorie et par intervention"),
-          card_body(
-            class = "p-0",
-            withSpinner(plotlyOutput(session$ns("stacked_barchart")))
-          )
+          (plotlyOutput(session$ns("stacked_barchart"), height = "100%"))
         ),
         nav_panel(
           "2",
+          fill = TRUE,
           card_title("% Contribution par catégorie par intervention"),
-          card_body(
-            class = "p-0",
-            withSpinner(plotlyOutput(session$ns("stacked_prop")))
-          )
+          (plotlyOutput(session$ns("stacked_prop"), height = "100%"))
         ),
         nav_panel(
           "3",
+          fill = TRUE,
           card_title("Les 15 principaux éléments de coût spécifiques"),
-          card_body(
-            class = "p-0",
-            withSpinner(plotlyOutput(session$ns("lolipop_chart")))
-          )
-        )
+          (plotlyOutput(session$ns("lolipop_chart"), height = "100%"))
+        ),
+        card_footer(input$year_select)
       ),
 
       # Card 3: Spatial Cost Summaries with conditional tabs
@@ -800,8 +768,8 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
           card_title("Coûts totaux au niveau de la province"),
           full_screen = TRUE,
           card_body(
-            class = "p-0",
-            withSpinner(leafletOutput(session$ns("adm1_total_map")))
+            class = "p-0 d-flex align-items-stretch",
+            (leafletOutput(session$ns("adm1_total_map")))
           )
         ),
         nav_panel(
@@ -809,8 +777,8 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
           card_title("Coût par personne au niveau de la province"),
           full_screen = TRUE,
           card_body(
-            class = "p-0",
-            withSpinner(leafletOutput(session$ns("adm1_pp_map")))
+            class = "p-0 d-flex align-items-stretch",
+            (leafletOutput(session$ns("adm1_pp_map")))
           )
         ),
         nav_panel(
@@ -818,8 +786,8 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
           card_title("Coûts totaux au niveau de la zone de santé"),
           full_screen = TRUE,
           card_body(
-            class = "p-0",
-            withSpinner(leafletOutput(session$ns("adm2_total_map")))
+            class = "p-0 d-flex align-items-stretch",
+            (leafletOutput(session$ns("adm2_total_map")))
           )
         ),
         nav_panel(
@@ -827,10 +795,11 @@ tab3Server <- function(input, output, session, adm2_outline, adm1_outline, share
           card_title("Coût par personne dans la zone de santé"),
           full_screen = TRUE,
           card_body(
-            class = "p-0",
-            withSpinner(leafletOutput(session$ns("adm2_pp_map")))
+            class = "p-0 d-flex align-items-stretch",
+            (leafletOutput(session$ns("adm2_pp_map")))
           )
-        )
+        ),
+        card_footer(input$year_select)
       )
     )
   })

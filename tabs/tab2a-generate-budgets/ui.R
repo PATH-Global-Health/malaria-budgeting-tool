@@ -29,7 +29,7 @@ tab2aUI <- function(id) {
       actionButton(ns("show_instructions"), "📘 Instructions détaillées", class = "btn-info"),
 
       # Baseline assumptions pop up
-      actionButton(ns("show_assumptions"), "📘 Budget assumptions", class = "btn-info")
+      actionButton(ns("show_assumptions"), "📘 Hypothèses budgétaires", class = "btn-info")
     ),
     layout_columns(
       col_widths = c(7, 5), # Left column wider than right

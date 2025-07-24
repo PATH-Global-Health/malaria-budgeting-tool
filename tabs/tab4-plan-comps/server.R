@@ -11,17 +11,10 @@ tab4Server <- function(input, output, session,
       size = "l",
       footer = modalButton("Fermer"),
       tagList(
-        p("Cette section permet aux utilisateurs de comparer les budgets de différents plans d'intervention. Ces comparaisons sont effectuées à l'échelle nationale uniquement et aident les utilisateurs à comprendre les différences de composition des interventions, de répartition budgétaire et de coût total entre les plans."),
-        tags$b("Étapes d'utilisation :"),
-        tags$ol(
-          tags$li("📂 Sélectionnez le plan de base"),
-          tags$li("📋 Sélectionnez un ou plusieurs plans à comparer"),
-          tags$li("🗓️ Sélectionnez l'année d'intérêt et la devise"),
-          tags$li("🗺️ Voir les cartes comparatives côte à côte"),
-          tags$li("📈 Consultez le tableau comparatif des coûts totaux"),
-          tags$li("📊 Consultez la comparaison budgétaire spécifique à l'intervention")
-        ),
-        p("📝 Conseil : utilisez cette page pour mettre en évidence les compromis entre les scénarios de financement et identifier les interventions ou les zones géographiques qui entraînent des différences de coûts.")
+        p("Cette section permet aux utilisateurs de comparer les budgets côte à côte. Les comparaisons sont effectuées à l'échelle nationale uniquement et aident les utilisateurs à comprendre les différences dans la combinaison d'interventions, les exigences budgétaires et l'évolution des coûts entre les différents plans."),
+        p("Sélectionnez le budget principal, c'est à cela que seront comparés les budgets restants."),
+        p("Sélectionnez un ou plusieurs budgets de comparaison."),
+        p("Sélectionnez l'année qui vous intéresse et la devise.")
       )
     ))
   })
@@ -224,8 +217,8 @@ tab4Server <- function(input, output, session,
       card_body( # use card_body_fill instead of card_body
         layout_column_wrap(
           width = 1 / 2,
-          withSpinner(plotlyOutput(ns("budget_comp_chart"), height = "100%")),
-          withSpinner(plotlyOutput(ns("budget_diff_chart"), height = "100%"))
+          (plotlyOutput(ns("budget_comp_chart"), height = "100%")),
+          (plotlyOutput(ns("budget_diff_chart"), height = "100%"))
         )
       ),
       card_footer(paste(input$year_select))
@@ -269,7 +262,7 @@ tab4Server <- function(input, output, session,
     card(
       card_header("Tableau récapitulatif du budget de base"),
       card_body(
-        withSpinner(DT::dataTableOutput(ns("budget_table"))) # Output table with loading spinner
+        (DT::dataTableOutput(ns("budget_table"))) # Output table with loading spinner
       )
     )
   })
@@ -386,7 +379,7 @@ tab4Server <- function(input, output, session,
       card_header("Comparaisons des coûts des articles"),
       card_body(
         class = "p-0",
-        withSpinner(plotlyOutput(ns("final_cost_plot")))
+        (plotlyOutput(ns("final_cost_plot")))
       ),
       card_footer(input$year_select)
     )

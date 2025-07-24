@@ -39,10 +39,21 @@ tab0UI <- function(id) {
             tags$li("Les colonnes « type_ » comportent des listes déroulantes permettant de sélectionner le type d'intervention spécifique délivré ")
           ),
           # Add image here
-          tags$img(
-            src = "scenario-template-image.png",
-            style = "max-width:100%; height:auto; margin-top:15px;",
-            alt = "Exemple de modèle de scénario"
+          div(
+            style = "text-align: center; margin-top: 20px;",
+            tags$a(
+              href = "scenario-template-image.png", # path relative to www/
+              target = "_blank", # open in new tab
+              tags$img(
+                src = "scenario-template-image.png",
+                style = "max-width: 100%; height: auto; border: 1px solid #ccc; cursor: zoom-in;",
+                alt = "Exemple de modèle de scénario"
+              )
+            ),
+            tags$div(
+              style = "font-style: italic; font-size: 90%; margin-top: 5px;",
+              "Cliquez sur l'image pour l'agrandir"
+            )
           ),
           p("Une fois qu'un plan a été spécifié en indiquant les interventions à cibler, où chaque année l'utilisateur peut sauvegarder une copie locale de ce fichier."),
           p("Revenez à l'application Web et téléchargez le fichier Excel complété à l'aide du bouton Télécharger."),
@@ -69,10 +80,21 @@ tab0UI <- function(id) {
             tags$li("Les colonnes « Notes » et « Source » peuvent être utilisées pour stocker des notes et des détails spécifiques sur la source de données utilisée pour générer les coûts unitaires. ")
           ),
           # Add image here
-          tags$img(
-            src = "unit-template-image.png",
-            style = "max-width:100%; height:auto; margin-top:15px;",
-            alt = "Exemple de modèle de coûts unitaires"
+          div(
+            style = "text-align: center; margin-top: 20px;",
+            tags$a(
+              href = "unit-template-image.png", # path relative to www/
+              target = "_blank", # open in new tab
+              tags$img(
+                src = "unit-template-image.png",
+                style = "max-width: 100%; height: auto; border: 1px solid #ccc; cursor: zoom-in;",
+                alt = "Exemple de modèle de coûts unitaires"
+              )
+            ),
+            tags$div(
+              style = "font-style: italic; font-size: 90%; margin-top: 5px;",
+              "Cliquez sur l'image pour l'agrandir"
+            )
           ),
           p("Une fois que les données de coût unitaire ont été spécifiées, l'utilisateur peut enregistrer une copie locale de ce fichier."),
           p("Revenez à l'application Web et téléchargez le fichier Excel complété à l'aide du formulaire et donnez à la feuille de coûts un nom : par exemple « Coût 1 », etc. et une description : par exemple « Basé sur les données de coûts historiques » – assurez-vous qu'il s'agit de descriptions informatives car elles seront utiles lors de la génération et de la comparaison des plans."),

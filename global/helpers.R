@@ -237,7 +237,7 @@ get_population_summary <- function(target_population, spatial_scale, adm1_select
 create_icon_summaries <- function(spatial_scale, adm1_select, year_select,
                                   adm2_select, currency_select, available_budget,
                                   data, target_population, ns = identity) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   # Get population data
   pop_data <- get_population_summary(target_population, spatial_scale, adm1_select, adm2_select, year_select)
@@ -460,7 +460,7 @@ create_budget_table <- function(processed_data, currency_select, baseline_data =
     "Coût total" = "total_cost"
   )
 
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   # Add comparison columns if baseline is provided
   if (!is.null(baseline_data)) {
@@ -557,7 +557,7 @@ donut_plot <- function(data) {
 
 #-TREE MAP--------------------------------------------------------------
 treemap_plot <- function(data, currency_select) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   intervention_totals <-
     data |>
@@ -580,7 +580,7 @@ treemap_plot <- function(data, currency_select) {
 
 #-STACKED BAR PLOT----------------------------------------------------
 stacked_plot <- function(data, currency_select) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   proc_impl_split <-
     data |>
@@ -635,7 +635,7 @@ stacked_plot <- function(data, currency_select) {
 
 #-stacked proportional plot-----------------------------------------
 stacked_plot_prop <- function(data, currency_select) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   proc_impl_split <-
     data |>
@@ -678,7 +678,7 @@ stacked_plot_prop <- function(data, currency_select) {
       ),
       yaxis = list(
         title = "Proportion du coût total de l'intervention",
-        tickformat = "%",
+        tickformat = ".0%", # 0 decimal places
         tickfont = list(size = 12)
       ),
       legend = list(
@@ -695,7 +695,7 @@ stacked_plot_prop <- function(data, currency_select) {
 
 #-lolipop plot for specific elements---------------------------------------------
 lolipop_plot <- function(data, currency_select) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   # Get top costs and include intervention information
   top_costs <-
@@ -703,7 +703,7 @@ lolipop_plot <- function(data, currency_select) {
     arrange(desc(cost_element)) |>
     head(15) |>
     mutate(
-      label = paste0(intervention_nice, " ", cost_class, " coût", ifelse("unit" %in% names(data), unit, ""))
+      label = paste0(intervention_nice, " ", cost_class, " coût ", ifelse("unit" %in% names(data), unit, ""))
     )
 
   plot_ly(colors = c("#3779E5", "#181D31", "#81CF98", "#B2BABB")) |>
@@ -853,7 +853,7 @@ cost_dist_map <- function(map_level,
       values = values,
       title = paste(title, "(", currency_select, ")"),
       labFormat = labelFormat(
-        prefix = if (currency_select == "USD") "$" else "FC"
+        prefix = if (currency_select == "USD") "$" else "FC "
       )
     )
 
@@ -887,7 +887,7 @@ cost_dist_map <- function(map_level,
 }
 
 format_cost_label <- function(value, currency_select, is_per_person = FALSE) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   if (is_per_person) {
     paste0(currency_symbol, round(value, 2))
@@ -899,7 +899,7 @@ format_cost_label <- function(value, currency_select, is_per_person = FALSE) {
 #-Budget comparison plot-------------------------------------------------------------------------
 # Cost Comparison Plot
 budget_barchart <- function(data, currency_select) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   data <- data |>
     mutate(
@@ -936,14 +936,14 @@ budget_barchart <- function(data, currency_select) {
 
 # cost difference plot-----------------------------------------------------------------------
 budget_diff_chart <- function(data, currency_select) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   data <- data |> mutate(label_wrapped = stringr::str_wrap(label, width = 40))
 
   p <- ggplot(data, aes(x = difference_millions, y = label_wrapped, text = hover_text)) +
     geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
     geom_segment(aes(x = 0, xend = difference_millions, yend = label_wrapped),
-      color = ifelse(data$difference_millions >= 0, "#ED7D31", "#4472C4")
+      color = ifelse(data$difference_millions >= 0, "#f88a73", "lightgreen")
     ) +
     geom_point(size = 4) +
     theme_minimal() +
@@ -962,7 +962,7 @@ budget_diff_chart <- function(data, currency_select) {
 #-final cost plot-------------------------------------------------------------------------
 #--- Helper: Process and format data for plotting ----
 prepare_cost_plot_data <- function(plan_select, currency_select, spatial_scale, year_select, baseline_plan) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   dat <-
     purrr::map_df(plan_select, function(plan) {
@@ -999,7 +999,7 @@ prepare_cost_plot_data <- function(plan_select, currency_select, spatial_scale, 
 
 #--- Main Plot Function (returns plotly object) ----
 generate_final_cost_plot <- function(baseline_processed, comparison_processed, currency_select) {
-  currency_symbol <- if (currency_select == "USD") "$" else "₦"
+  currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
   # Add label column
   baseline <- baseline_processed %>%
@@ -1021,7 +1021,7 @@ generate_final_cost_plot <- function(baseline_processed, comparison_processed, c
     mutate(
       is_different = total_cost != baseline_total,
       tc_print = case_when(
-        currency_select == "NGN" ~ paste0(currency_symbol, format(round(total_cost, 0), big.mark = ","), "m"),
+        currency_select == "CDF" ~ paste0(currency_symbol, format(round(total_cost, 0), big.mark = ","), "m"),
         currency_select == "USD" & total_cost > 60 ~ paste0(currency_symbol, format(round(total_cost, 0), big.mark = ","), "m"),
         currency_select == "USD" & total_cost <= 60 & total_cost > 1 ~ paste0(currency_symbol, format(round(total_cost, 1), big.mark = ","), "m"),
         currency_select == "USD" & total_cost <= 1 ~ paste0(currency_symbol, format(round(total_cost, 2), big.mark = ","), "m"),

@@ -1,0 +1,12 @@
+name: budgetaire-paludisme-drc
+title: budgetaire-paludisme-drc
+username: pathmalaria
+account: pathmalaria
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 15113781
+bundleId: 10662084
+url: https://pathmalaria.shinyapps.io/budgetaire-paludisme-drc/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

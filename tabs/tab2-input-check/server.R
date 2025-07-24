@@ -73,19 +73,22 @@ tab2Server <- function(input, output, session, shared) {
       size = "l",
       footer = modalButton("Fermer"),
       tagList(
-        p("Une fois le plan téléchargé, l'utilisateur peut accéder à l'onglet « Vérifier le scénario ». Cette section permet de valider les plans d'intervention téléchargés et de signaler toute incohérence ou erreur de logique. Elle fournit un résumé visuel et tabulaire rapide de la couverture des interventions par État et par année."),
-        p("La section signalera également les erreurs de livraison potentielles à l'aide d'alertes d'avertissement."),
+        p("Une fois qu'un plan a été téléchargé, l'utilisateur peut passer à l'onglet « Vérifier le scénario ». Cette section permet aux utilisateurs de valider leurs plans d'intervention téléchargés et de signaler toute incohérence ou erreur logique."),
         tags$b("Étapes d'utilisation :"),
-        tags$ol(
-          tags$li("📂 Sélectionnez un plan précédemment téléchargé dans le menu déroulant."),
-          tags$li("📅 Sélectionnez l'année qui vous intéresse dans la liste déroulante. Les données seront mises à jour en conséquence."),
-          tags$li("💉 Cliquez sur un onglet d’intervention (par exemple, SMC, Vaccin, IRS, etc.) pour afficher les informations de ciblage."),
-          tags$li("📊 Consultez les statistiques de couverture des titres affichées sous forme de cases récapitulatives colorées : ✅ Couverture complète, 🟧 Couverture partielle, ❌ Aucune couverture."),
-          tags$li("📋 Consultez le tableau interactif ci-dessous pour voir les décomptes détaillés par État."),
-          tags$li("🔍 Utilisez la barre de recherche pour trouver rapidement des états ou des valeurs spécifiques."),
-          tags$li("⚠️ Si l'outil détecte une erreur de ciblage d'intervention, elle sera signalée à l'utilisateur. Exemple : <capture d'écran>")
+        tags$ul(
+          tags$li("Sélectionnez un forfait précédemment téléchargé dans le menu déroulant."),
+          tags$li("Sélectionnez l'année qui vous intéresse dans la liste déroulante."),
+          tags$li("Les données rempliront une table en conséquence."),
+          tags$li("Cliquez sur l'onglet d'une intervention pour afficher les informations de ciblage"),
+          tags$li("Affichez les statistiques de couverture des titres affichées sous forme de cases récapitulatives colorées"),
+          tags$ul(
+            tags$li("🟩 Couverture complète – nombre de provinces où toutes les zones de santé bénéficient de l'intervention spécifique."),
+            tags$li("🟧 Couverture partielle – nombre de provinces avec seulement certaines zones de santé ciblées, mais pas toutes"),
+            tags$li("🟥 Aucune couverture – nombre de provinces sans zones de santé ciblées"),
+          ),
+          tags$li("•	Le tableau récapitule à l'échelle provinciale pour l'année sélectionnée, le nombre de zones de santé dans cette province, le nombre de bénéficiaires de l'intervention sélectionnée, le nombre de personnes ne recevant pas l'intervention et le pourcentage de couverture de cette intervention à l'échelle de la province.")
         ),
-        p("📝 Astuce : utilisez cette section pour vérifier l'exactitude de votre scénario téléchargé avant de générer des budgets.")
+        p("Si l'utilisateur détecte des erreurs dans la spécification de la combinaison d'interventions, il peut revenir à l'onglet de téléchargement des données, supprimer la feuille de calcul incorrecte de l'application, corriger la version enregistrée localement et la télécharger à nouveau dans l'application.")
       )
     ))
   })

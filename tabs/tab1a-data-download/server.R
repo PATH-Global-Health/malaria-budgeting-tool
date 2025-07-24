@@ -877,50 +877,81 @@ tab1aServer <- function(input, output, session,
       size = "l",
       footer = modalButton("Fermer"),
       tagList(
-        p("Cette section permet à l'utilisateur de télécharger des plans d'intervention contre le paludisme à des fins de budgétisation. Chaque nouvelle feuille de calcul représente un plan pour des années et des lieux spécifiques, détaillant les interventions prévues."),
-        p("L'outil est conçu pour un contexte national spécifique et comprend les données prédéfinies suivantes nécessaires aux calculs budgétaires :"),
+        p("Cette section permet à l'utilisateur de spécifier des plans opérationnels de lutte contre le paludisme pour la budgétisation d'années et de lieux spécifiques, en détaillant les interventions qui doivent être mises en œuvre."),
+        tags$b("1. Définir la combinaison d'intervention:"),
+        p("Sélectionnez Années de planification pour définir l'étendue de votre scénario."),
+        p("Cliquez sur « Télécharger le modèle de scénario vide »."),
+        p("Remplissez le modèle Excel: "),
         tags$ul(
-          tags$li("Limites administratives et noms"),
-          tags$li("Masse continentale en km2"),
-          tags$li("Indicateur du statut urbain de la plus petite unité spatiale utilisée pour la planification des interventions."),
-          tags$li("Données sur la population cible"),
-          tags$li("Nombre d'établissements de santé par type (primaire, secondaire, tertiaire) par unité spatiale"),
-          tags$li("Données sur la prévalence des parasites chez les moins de 5 ans issues des enquêtes DHS"),
-          tags$li("Données historiques sur la couverture des interventions")
+          tags$li("Chaque feuille correspond à une année qui a été spécifiée dans l'outil. "),
+          tags$li("Chaque ligne représente la plus petite unité spatiale utilisée pour la planification de l'intervention (niveau de la zone de santé) avec les données adm0, amd1 et adm2 préspécifiées pour le pays d'intérêt (RDC)."),
+          tags$li("Les colonnes « code_ » détaillent un type spécifique d'intervention antipaludique qui peut être dispensée, comme suit : 1 = Oui en cours de livraison OU 0/Blanc = Non non livré."),
+          tags$li("Les colonnes « type_ » comportent des listes déroulantes permettant de sélectionner le type d'intervention spécifique délivré ")
         ),
-        tags$b("Étapes d'utilisation – Aucune donnée précédente téléchargée :"),
-        p("Suivez ces étapes si vous avez déjà utilisé l’outil – consultez la capture d’écran référencée pour vous référer entre les étapes."),
-        tags$ol(
-          tags$li("📆️ Sélectionnez les années de planification pour définir la portée de votre scénario"),
-          tags$li("📄 Cliquez sur « Télécharger le modèle de scénario vide »"),
-          tags$li("📊 Remplissez le modèle Excel : chaque feuille correspond à une année et chaque ligne représente la plus petite unité spatiale utilisée pour la planification des interventions. Chaque colonne détaille un type spécifique d'intervention contre le paludisme, précédé du mot « code_ ». Saisissez 1 pour les interventions prévues et 0 dans les autres cas. Dans la colonne « type_ » correspondante, sélectionnez le type d'intervention prévu pour chaque intervention. Par exemple, dans la colonne « type_vaccin », sélectionnez « R21 » ou « RTSS ». Si le type d'intervention n'est pas inclus dans la liste déroulante, vous pouvez le remplacer par du texte libre."),
-          tags$li("💾 Une fois qu'un plan a été spécifié en indiquant quelles interventions doivent être ciblées, où chaque année l'utilisateur peut enregistrer une copie locale de ce fichier."),
-          tags$li("📤 Revenez à l'application Web et téléchargez le fichier Excel complété à l'aide du formulaire, puis donnez au scénario un nom court : par exemple Plan A/Plan 1, etc. et une description : par exemple « Plan entièrement déployé »/« Plan de déploiement restreint du vaccin » - assurez-vous qu'il s'agit de descriptions informatives, car elles seront utiles lors de la comparaison des plans."),
-          tags$li("📂 Appuyez sur le bouton « Soumettre le scénario » et la feuille de calcul sera téléchargée dans l’outil."),
-          tags$li("📋 Les plans téléchargés apparaîtront dans un tableau récapitulatif avec des détails tels que le nom du plan, les années couvertes et la date de téléchargement."),
-          tags$li("💵 Nous devons maintenant également spécifier les coûts unitaires qui seront essentiels pour que l’outil génère nos budgets."),
-          tags$li("📄 Cliquez sur « Télécharger le modèle de coût vide »"),
-          tags$li("📊 Remplissez le modèle Excel : Le modèle de coût unitaire permet à l'utilisateur d'avoir la flexibilité de spécifier les coûts unitaires exacts pertinents au contexte du pays. Le modèle comporte les colonnes suivantes :"),
-          tags$ul(
-            tags$li("resource_name : description longue des données de coût unitaire, par exemple « Coût d'achat du vaccin antipaludique par dose »"),
-            tags$li("code_intervention : sélectionnez dans la liste déroulante le type d'intervention auquel le coût unitaire est lié, par exemple vaccin/campagne_itn/smc"),
-            tags$li("type_intervention : sélectionnez dans la liste déroulante le type spécifique de coût unitaire d'intervention auquel se rapporte, par exemple r21/rtss/pyrethroid_net/PBO net"),
-            tags$li("cost_class : sélectionnez dans la liste déroulante la classe de coût : par exemple, approvisionnement/distribution/opérationnel/support"),
-            tags$li("unité : précisez l'unité exacte, par exemple par dose, par MII, par enfant, etc."),
-            tags$li("local_currency_cost : coût spécifique en monnaie locale"),
-            tags$li("usd_cost : Coût spécifique en USD"),
-            tags$li("cost_year : année à laquelle le coût se rapporte"),
-            tags$li("source : référencez la source de coût utilisée pour générer les données de coût unitaire")
+        # Add image here
+        div(
+          style = "text-align: center; margin-top: 20px;",
+          tags$a(
+            href = "scenario-template-image.png", # path relative to www/
+            target = "_blank", # open in new tab
+            tags$img(
+              src = "scenario-template-image.png",
+              style = "max-width: 100%; height: auto; border: 1px solid #ccc; cursor: zoom-in;",
+              alt = "Exemple de modèle de scénario"
+            )
           ),
-          tags$li("Assurez-vous que pour chaque intervention réalisée, il existe des coûts unitaires pour l’intervention spécifique et le type d’intervention."),
-          tags$li("💾 Une fois les données de coût unitaire spécifiées, l'utilisateur peut enregistrer une copie locale de ce fichier."),
-          tags$li("📤 Revenez à l'application Web et téléchargez le fichier Excel complété à l'aide du formulaire et donnez un nom à la feuille de coûts : par exemple « Hypothèses de coûts 1 », etc. et une description : par exemple « Y compris une estimation de coût plus élevée de l'approvisionnement pour les filets PBO » - assurez-vous qu'il s'agit de descriptions informatives car elles seront utiles lors de la génération et de la comparaison des plans."),
-          tags$li("📂 Appuyez sur le bouton « Soumettre la feuille de coûts » et la feuille de calcul sera téléchargée dans l’outil."),
-          tags$li("📋 Les données de coût téléchargées apparaîtront dans un tableau récapitulatif avec des détails tels que le nom du coût, la description et la date de téléchargement.")
+          tags$div(
+            style = "font-style: italic; font-size: 90%; margin-top: 5px;",
+            "Cliquez sur l'image pour l'agrandir"
+          )
         ),
-        tags$b("Étapes d’utilisation – Données précédentes téléchargées :"),
-        p("Une fois qu'une feuille de calcul a été téléchargée dans l'outil, l'utilisateur est capable de télécharger un modèle basé sur un scénario spécifique téléchargé - cela peut faciliter le remplissage rapide d'un nouveau scénario sans avoir à répliquer chaque élément, mais assurez-vous de saisir un nouveau nom de scénario et une nouvelle description lors du nouveau téléchargement."),
-        p("Une fois les deux ensembles de données téléchargés, l’utilisateur peut passer à l’étape suivante de l’application.")
+        p("Une fois qu'un plan a été spécifié en indiquant les interventions à cibler, où chaque année l'utilisateur peut sauvegarder une copie locale de ce fichier."),
+        p("Revenez à l'application Web et téléchargez le fichier Excel complété à l'aide du bouton Télécharger."),
+        p("Donnez au scénario un nom abrégé : par exemple Plan 1 BAU et une description : par exemple « Interventions simples - campagnes de masse, distribution de routine et CPP minimal » – assurez-vous qu'il s'agit de descriptions informatives, car elles seront utiles lors de la comparaison des plans."),
+        p("Appuyez sur le bouton « Soumettre le scénario » et la feuille de calcul sera téléchargée dans l'outil. Les plans téléchargés apparaîtront dans un tableau récapitulatif avec les détails associés."),
+        tags$b("2. Définition des coûts unitaires:"),
+        p("Cliquez sur « Télécharger le modèle de coût vide »."),
+        p("Assurez-vous que les en-têtes de colonne des colonnes A : J restent inchangés et que des colonnes supplémentaires peuvent être ajoutées selon les besoins de l'utilisateur."),
+        p("Des feuilles supplémentaires pour le suivi des calculs de coûts unitaires, par exemple, peuvent également être ajoutées librement."),
+        p("Les cellules ne contiennent pas de formules prédéfinies et c'est à l'utilisateur de saisir ou de calculer les données comme il l'entend."),
+        p("Le modèle est prérempli avec certaines interventions, types d'intervention, classes de coûts et unités courants – ces lignes peuvent être modifiées et/ou supprimées selon les besoins de l'utilisateur, mais assurez-vous que pour chaque intervention réalisée dans le plan opérationnel, il y a des coûts unitaires pour l'intervention spécifique et le type d'intervention."),
+        p("S'il le souhaite, l'utilisateur peut également ajouter des coûts unitaires spécifiques à l'emplacement. Pour ce faire, ajoutez des colonnes supplémentaires pour les spécifications 'adm1' et adm2' et assurez-vous que les noms sont cohérents entre celle-ci et la feuille de calcul du mix d'intervention, l'outil s'occupera du reste!"),
+        p("Remplissez le modèle Excel : "),
+        tags$ul(
+          tags$li("« code_intervention » : Sélectionnez dans la liste déroulante l'intervention à laquelle les données de coût se rapportent."),
+          tags$li("« type_intervention » : Sélectionnez dans la liste déroulante le type d'intervention spécifique auquel le coût se rapporte. Ces valeurs se rapportent à la colonne « type_ » du modèle précédent. Si l'utilisateur souhaite inclure des coûts fixes pour une intervention, cela est également spécifié dans cette colonne, par exemple Coûts fixes pour l'entreposage annuel de moustiquaires au cours d'une campagne."),
+          tags$li("« cout_classe » : Sélectionnez la classe de coûts (Approvisionnement, Distribution, Opérationnel, Support, Autre) Si vous sélectionnez « autre », indiquez dans la colonne « cout_classe_autre » de quoi il s'agit."),
+          tags$li("« description » : fournissez une brève description des composants du coût unitaire dans la colonne de description."),
+          tags$li("« unite » : Sélectionnez dans la liste déroulante l'unité spécifique pour le coût, par exemple par filet, par enfant, par dose, par an , etc."),
+          tags$li("« cout_monnaie_locale » : Valeur monétaire du coût unitaire spécifique en CDF"),
+          tags$li("« taux_de_change » : taux de change à convertir de CDF en USD pour renseigner les valeurs de coût unitaire dans la  colonne « cout_usd » "),
+          tags$li("« count_annee_pour_analyse » : cette valeur est l'année du plan opérationnel pour lequel le coût unitaire doit être utilisé pour calculer le budget. Si cette colonne est laissée vide, le même coût unitaire sera appliqué pour chaque année de livraison dans le plan spécifié."),
+          tags$li("Pour faciliter la conversion des estimations de coût unitaire générées à partir de données historiques en valeurs monétaires actuelles, il existe les colonnes supplémentaires suivantes pour faciliter cette tâche : « cout_unitaire_d'origine » l' estimation du coût unitaire d'origine, « cout_unitaire_original_annee » l'année des données utilisées pour estimer le coût unitaire et enfin « facteur_d'inflation_initial_à_l'année_d'analyse » le facteur d'inflation à appliquer pour avoir des coûts unitaires en valeurs attendues actuelles et futures"),
+          tags$li("Les colonnes « Notes » et « Source » peuvent être utilisées pour stocker des notes et des détails spécifiques sur la source de données utilisée pour générer les coûts unitaires. ")
+        ),
+        # Add image here
+        div(
+          style = "text-align: center; margin-top: 20px;",
+          tags$a(
+            href = "unit-template-image.png", # path relative to www/
+            target = "_blank", # open in new tab
+            tags$img(
+              src = "unit-template-image.png",
+              style = "max-width: 100%; height: auto; border: 1px solid #ccc; cursor: zoom-in;",
+              alt = "Exemple de modèle de coûts unitaires"
+            )
+          ),
+          tags$div(
+            style = "font-style: italic; font-size: 90%; margin-top: 5px;",
+            "Cliquez sur l'image pour l'agrandir"
+          )
+        ),
+        p("Une fois que les données de coût unitaire ont été spécifiées, l'utilisateur peut enregistrer une copie locale de ce fichier."),
+        p("Revenez à l'application Web et téléchargez le fichier Excel complété à l'aide du formulaire et donnez à la feuille de coûts un nom : par exemple « Coût 1 », etc. et une description : par exemple « Basé sur les données de coûts historiques » – assurez-vous qu'il s'agit de descriptions informatives car elles seront utiles lors de la génération et de la comparaison des plans."),
+        p("Appuyez sur le bouton « Soumettre la feuille de coûts » et la feuille de calcul sera téléchargée dans l'outil."),
+        p("Les données de coût téléchargées apparaîtront dans un tableau récapitulatif."),
+        tags$b("3. Données précédentes téléchargées :"),
+        p("Une fois qu'une feuille de calcul a été téléchargée dans l'outil, l'utilisateur est capable de télécharger un modèle basé sur un scénario spécifique téléchargé - cela peut faciliter le remplissage rapide d'un nouveau scénario sans avoir à répliquer chaque élément, mais assurez-vous de saisir un nouveau nom et une nouvelle description de scénario lors du rechargement.")
       )
     ))
   })
