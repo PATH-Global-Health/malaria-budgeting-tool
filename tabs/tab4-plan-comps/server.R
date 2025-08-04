@@ -1,9 +1,10 @@
 tab4Server <- function(input, output, session,
                        adm2_outline, adm1_outline,
                        shared) {
+  # Namespace for the session
   ns <- session$ns
 
-  # Adding instructions pop up
+  #-INSTRUCTIONS POP UP---------------------------------------------------------
   observeEvent(input$show_instructions, {
     showModal(modalDialog(
       title = "Instructions détaillées pour l'utilisation du point de contrôle",
@@ -18,6 +19,8 @@ tab4Server <- function(input, output, session,
       )
     ))
   })
+
+  #-DATA MANAGEMENT MISC--------------------------------------------------------
 
   # Track local data availability
   local_data_available <- reactiveVal(FALSE)
@@ -50,95 +53,7 @@ tab4Server <- function(input, output, session,
     sort(unique(shared$budget_results$year))
   })
 
-  # Plan selection UI
-  output$plan_bl_select_ui <- renderUI({
-    plans <- available_plans()
-    selectInput(ns("plan_bl_select"), "Sélectionnez le budget principal:",
-      choices = c("", plans$plan_id),
-      selected = ""
-    )
-  })
-
-  output$remaining_plan_select <- renderUI({
-    req(input$plan_bl_select)
-    plans <- available_plans()
-    remaining <- setdiff(plans$plan_id, input$plan_bl_select)
-    checkboxGroupInput(
-      ns("remaining_plan_select"),
-      "Sélectionner des budgets de comparaison:",
-      choices = remaining
-    )
-  })
-
-  # Year selection UI
-  output$year_select_ui <- renderUI({
-    years <- available_years()
-    choices <- if (length(years) > 1) c("", as.character(years), "Toutes les années") else c("", as.character(years))
-    selectInput(
-      ns("year_select"),
-      "Sélectionnez les années d'intérêt:",
-      choices = choices,
-      selected = ""
-    )
-  })
-
-  # Filter baseline data
-  baseline_data <- reactive({
-    req(shared$budget_results, input$plan_bl_select, input$year_select != "")
-    data <- shared$budget_results %>%
-      filter(plan_id == input$plan_bl_select)
-    if (input$year_select != "" && input$year_select != "Toutes les années") {
-      data <- data %>% filter(year == as.numeric(input$year_select))
-    }
-    return(data)
-  })
-
-  # Filter comparison data
-  comparison_data <- reactive({
-    req(
-      shared$budget_results, input$remaining_plan_select,
-      input$year_select != ""
-    )
-
-    data <-
-      shared$budget_results %>%
-      filter(plan_id %in% input$remaining_plan_select)
-
-    if (input$year_select != "" && input$year_select != "Toutes les années") {
-      data <- data %>% filter(year == as.numeric(input$year_select))
-    }
-    return(data)
-  })
-
-  output$page_description <- renderUI({
-    # Generate the card content based on the state of the inputs
-    content <- if (is.null(input$plan_bl_select) || input$plan_bl_select == "") {
-      HTML("<p>Sélectionnez budget principal pour commencer les comparaisons.</p>")
-    } else if (is.null(input$remaining_plan_select) || length(input$remaining_plan_select) == 0) {
-      HTML(paste0(
-        "<p>Plan principal défini comme: <b>",
-        input$plan_bl_select,
-        "</b>. Sélectionnez un ou plusieurs plans à comparer.</p>"
-      ))
-    } else {
-      HTML(paste0(
-        "<div style='font-size:14px;'>",
-        "<b>Budget principal défini comme: </b> ", input$plan_bl_select, "<br><br>",
-        "<b>Budget(s) de comparaison défini(s) comme: </b><br>",
-        paste(input$remaining_plan_select, collapse = "<br>"),
-        "</div>"
-      ))
-    }
-
-    card(
-      card_header("Informations de sélection"),
-      card_body(content)
-    )
-  })
-
-  #-BUDGET COMPARISON PLOTS------------------------------------------------------------------
-
-  #-Reactive function for Cost Comparison Data----------------
+  # Reactive function for Cost Comparison Data preparations
   prepare_cost_data <- reactive({
     req(
       input$plan_bl_select, input$remaining_plan_select,
@@ -165,7 +80,7 @@ tab4Server <- function(input, output, session,
       summarise(total_budget = sum(cost_element, na.rm = TRUE), .groups = "drop")
   })
 
-  #-Prepare difference data
+  # Reactive function for Cost Difference Data preparations
   prepare_diff_data <- reactive({
     req(
       input$plan_bl_select, input$remaining_plan_select,
@@ -208,16 +123,103 @@ tab4Server <- function(input, output, session,
       )
   })
 
+  #-REACTIVE PRIMARY BUDGET UI--------------------------------------------------
+  output$plan_bl_select_ui <- renderUI({
+    plans <- available_plans()
+    selectInput(ns("plan_bl_select"), "Sélectionnez le budget principal:",
+      choices = c("", plans$plan_id),
+      selected = ""
+    )
+  })
 
-  # UI components for cost data-------------------------------
+  #-REACTIVE COMP BUDGET UI-----------------------------------------------------
+  output$remaining_plan_select <- renderUI({
+    req(input$plan_bl_select)
+    plans <- available_plans()
+    remaining <- setdiff(plans$plan_id, input$plan_bl_select)
+    checkboxGroupInput(
+      ns("remaining_plan_select"),
+      "Sélectionner des budgets de comparaison:",
+      choices = remaining
+    )
+  })
+
+  #-REACTIVE YEAR SELECT UI-----------------------------------------------------
+  output$year_select_ui <- renderUI({
+    years <- available_years()
+    choices <- if (length(years) > 1) c("", as.character(years), "Toutes les années") else c("", as.character(years))
+    selectInput(
+      ns("year_select"),
+      "Sélectionnez les années d'intérêt:",
+      choices = choices,
+      selected = ""
+    )
+  })
+
+  #-REACTIVE SELECT AND FILTER PRIMARY BUDGET DATA------------------------------
+  baseline_data <- reactive({
+    req(shared$budget_results, input$plan_bl_select, input$year_select != "")
+    data <- shared$budget_results %>%
+      filter(plan_id == input$plan_bl_select)
+    if (input$year_select != "" && input$year_select != "Toutes les années") {
+      data <- data %>% filter(year == as.numeric(input$year_select))
+    }
+    return(data)
+  })
+
+  #-REACTIVE SELECT AND FILTER COMP BUDGET DATA---------------------------------
+  comparison_data <- reactive({
+    req(
+      shared$budget_results, input$remaining_plan_select,
+      input$year_select != ""
+    )
+
+    data <-
+      shared$budget_results %>%
+      filter(plan_id %in% input$remaining_plan_select)
+
+    if (input$year_select != "" && input$year_select != "Toutes les années") {
+      data <- data %>% filter(year == as.numeric(input$year_select))
+    }
+    return(data)
+  })
+
+  #-RENDER SELECTION SUMMARY TEXT-----------------------------------------------
+  output$page_description <- renderUI({
+    # Generate the card content based on the state of the inputs
+    content <- if (is.null(input$plan_bl_select) || input$plan_bl_select == "") {
+      HTML("<p>Sélectionnez budget principal pour commencer les comparaisons.</p>")
+    } else if (is.null(input$remaining_plan_select) || length(input$remaining_plan_select) == 0) {
+      HTML(paste0(
+        "<p>Plan principal défini comme: <b>",
+        input$plan_bl_select,
+        "</b>. Sélectionnez un ou plusieurs plans à comparer.</p>"
+      ))
+    } else {
+      HTML(paste0(
+        "<div style='font-size:14px;'>",
+        "<b>Budget principal défini comme: </b> ", input$plan_bl_select, "<br><br>",
+        "<b>Budget(s) de comparaison défini(s) comme: </b><br>",
+        paste(input$remaining_plan_select, collapse = "<br>"),
+        "</div>"
+      ))
+    }
+
+    card(
+      card_header("Informations de sélection"),
+      card_body(content)
+    )
+  })
+
+
+  #-RENDER UI TOTAL BUDGET COMPARISON PLOTS----------------------------------------
   output$budget_comps <- renderUI({
     # plot card
     card(
       card_header("Comparaisons budgétaires"),
       full_screen = TRUE,
-      min_height = 450,
-      # style = "resize: vertical; overflow: auto; min-height: 300px; max-height: 800px;",
-      card_body( # use card_body_fill instead of card_body
+      card_body(
+        min_height = 450,
         layout_column_wrap(
           width = 1 / 2,
           (plotlyOutput(ns("budget_comp_chart"), height = "100%")),
@@ -228,8 +230,47 @@ tab4Server <- function(input, output, session,
     )
   })
 
+  #-RENDER PRIMARY BUDGET TABLE UI--------------------------------------------------
+  output$budget_tables <- renderUI({
+    card(
+      card_header("Tableau récapitulatif du budget de base"),
+      card_body(
+        (DT::dataTableOutput(ns("budget_table"))) # Output table with loading spinner
+      )
+    )
+  })
 
-  #-Plot one bar chart of total budget--------------------------
+  #-RENDER COMPARISON BUDGET TABLE UI--------------------------------------------------
+  output$budget_tables_comp <- renderUI({
+    req(input$plan_bl_select, input$remaining_plan_select, input$year_select, input$currency_select)
+
+    # Create a card for each comparison plan
+    lapply(input$remaining_plan_select, function(plan_id) {
+      safe_id <- safe_id(plan_id) # Sanitize plan_id for use in outputId
+
+      card(
+        card_header(paste("Plan de comparaison:", plan_id)),
+        card_body(
+          withSpinner(DT::dataTableOutput(ns(paste0("budget_table_comp_", safe_id)))) # Each plan has its own table output
+        )
+      )
+    }) |> tagList() # Combine all cards into a UI list
+  })
+
+  #-RENDER INTERVENTION TOTAL COST BAR CHART COMPARISON---------------------------------
+  output$budget_item_plots <- renderUI({
+    card(
+      full_screen = TRUE,
+      card_header("Comparaisons des coûts des articles"),
+      card_body(
+        class = "p-0",
+        (plotlyOutput(ns("final_cost_plot")))
+      ),
+      card_footer(input$year_select)
+    )
+  })
+
+  #-OUTPUT: TOTAL BUDGET BAR CHART-----------------------------------------------------
   output$budget_comp_chart <- renderPlotly({
     validate(
       need(input$plan_bl_select != "", "Sélectionnez un plan principal."),
@@ -244,13 +285,14 @@ tab4Server <- function(input, output, session,
     )
   })
 
-  #-plot two cost difference plot--------------------------------
+  #-OUTPUT: TOTAL DIFFERENCE LOLIPOP CHART------------------------------------------
   output$budget_diff_chart <- renderPlotly({
-    req(input$plan_bl_select != "",
-        input$remaining_plan_select != "",
-        input$year_select != "",
-        input$currency_select != ""
-        )
+    req(
+      input$plan_bl_select != "",
+      input$remaining_plan_select != "",
+      input$year_select != "",
+      input$currency_select != ""
+    )
 
 
     budget_diff_chart(
@@ -259,23 +301,7 @@ tab4Server <- function(input, output, session,
     )
   })
 
-  # ------------------------------------------------------------------------------
-  # Render the baseline budget table UI
-  # ------------------------------------------------------------------------------
-
-  output$budget_tables <- renderUI({
-    card(
-      card_header("Tableau récapitulatif du budget de base"),
-      card_body(
-        (DT::dataTableOutput(ns("budget_table"))) # Output table with loading spinner
-      )
-    )
-  })
-
-  # ------------------------------------------------------------------------------
-  # Render the baseline budget data table (as a DataTable)
-  # ------------------------------------------------------------------------------
-
+  #-OUTPUT: PRIMARY BUDGET SUMMARY TABALE------------------------------------------
   output$budget_table <- DT::renderDataTable({
     validate(
       need(input$plan_bl_select != "", "Sélectionnez un plan principal."),
@@ -295,50 +321,26 @@ tab4Server <- function(input, output, session,
     )
   })
 
-  # ------------------------------------------------------------------------------
-  # Render UI for comparison budget tables (one for each selected plan)
-  # ------------------------------------------------------------------------------
 
-  output$budget_tables_comp <- renderUI({
-    req(input$plan_bl_select, input$remaining_plan_select, input$year_select, input$currency_select)
-
-    # Create a card for each comparison plan
-    lapply(input$remaining_plan_select, function(plan_id) {
-      safe_id <- safe_id(plan_id) # Sanitize plan_id for use in outputId
-
-      card(
-        card_header(paste("Plan de comparaison:", plan_id)),
-        card_body(
-          withSpinner(DT::dataTableOutput(ns(paste0("budget_table_comp_", safe_id)))) # Each plan has its own table output
-        )
-      )
-    }) |> tagList() # Combine all cards into a UI list
-  })
-
-  # ------------------------------------------------------------------------------
-  # Main observer: Process all data and render comparison tables and cost plot
-  # ------------------------------------------------------------------------------
-
+  #-OUTPUT HANDLER: COMPARISON BUDGET TABLES AND INTERVENTION SPECIFIC BAR CHART-----
   observe({
     req(input$plan_bl_select, input$year_select, input$currency_select) # Ensure all necessary inputs are provided
 
-    # ---------------------------
-    # Process baseline plan data
-    # ---------------------------
+    # Process primary budget data
     baseline_processed <- process_budget_data(
       spatial_scale = "National",
       adm1_select = NULL,
       adm2_select = NULL,
       currency_select = input$currency_select,
       data = baseline_data()
-    ) |> mutate(total_cost = round(total_cost / 1e6, 0))
+    ) |>
+      mutate(total_cost = round(total_cost / 1e6, 0))
 
-    # ---------------------------
     # Process all comparison plan data
-    # ---------------------------
     comp_data <- comparison_data()
     all_comp_processed <- list() # Store all processed data
 
+    # dynamic comparisons
     purrr::walk(unique(comp_data$plan_id), function(plan_id) {
       safe_id <- safe_id(plan_id) # Sanitize for use in output ID
       plan_data <- comp_data %>% filter(plan_id == !!plan_id) # Filter data for this plan
@@ -363,9 +365,7 @@ tab4Server <- function(input, output, session,
       })
     })
 
-    # ---------------------------
     # Combine all comparison data and render the cost comparison plot
-    # ---------------------------
     combined_comp <- bind_rows(all_comp_processed, .id = "plan_id") # Add plan label to each row
 
     output$final_cost_plot <- renderPlotly({
@@ -381,21 +381,5 @@ tab4Server <- function(input, output, session,
         currency_select = input$currency_select
       )
     })
-  })
-
-  # ------------------------------------------------------------------------------
-  # Render UI for the final cost comparison plot
-  # ------------------------------------------------------------------------------
-
-  output$budget_item_plots <- renderUI({
-    card(
-      full_screen = TRUE,
-      card_header("Comparaisons des coûts des articles"),
-      card_body(
-        class = "p-0",
-        (plotlyOutput(ns("final_cost_plot")))
-      ),
-      card_footer(input$year_select)
-    )
   })
 }

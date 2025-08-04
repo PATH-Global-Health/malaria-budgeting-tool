@@ -1,19 +1,31 @@
 tab0UI <- function(id) {
+  #-NAMESPACING the module----------------------------
   ns <- NS(id)
+
+  #-MAIN PAGE CONTENT---------------------------------
   fluidPage(
+
+    # Yellow message banner at the top (alert-style)
     div(
       style = "background-color: #fff3cd; border-left: 6px solid #ffa500; padding: 15px; margin-bottom: 20px;",
       strong(head_bold),
       main_text
     ),
+
+    # Main title and introductory text
     titlePanel("Outil de comparaison des budgets de lutte contre le paludisme DEMO"),
     h6("Cet outil aide les programmes nationaux de lutte contre le paludisme à générer, examiner et comparer les budgets d’intervention contre le paludisme dans différents scénarios opérationnels."),
     h6("Suivez les instructions ci-dessous pour naviguer dans l'outil. Chaque section explique comment saisir des données, afficher des résultats et générer des rapports."),
     br(),
+
+    # Instructions header
     h3("Instructions"),
+
+    #-ACCORDIAN PANEL INSTRUCTIONS-------------------
     accordion(
       id = ns("instructions"),
       open = FALSE,
+      #-METHODS------------------
       accordion_panel(
         title = "Méthodes",
         open = FALSE,
@@ -23,6 +35,7 @@ tab0UI <- function(id) {
           )
         )
       ),
+      #-DATA UPLOAD--------------
       accordion_panel(
         title = "Entrées utilisateur",
         open = FALSE,
@@ -38,12 +51,11 @@ tab0UI <- function(id) {
             tags$li("Les colonnes « code_ » détaillent un type spécifique d'intervention antipaludique qui peut être dispensée, comme suit : 1 = Oui en cours de livraison OU 0/Blanc = Non non livré."),
             tags$li("Les colonnes « type_ » comportent des listes déroulantes permettant de sélectionner le type d'intervention spécifique délivré ")
           ),
-          # Add image here
           div(
             style = "text-align: center; margin-top: 20px;",
             tags$a(
-              href = "scenario-template-image.png", # path relative to www/
-              target = "_blank", # open in new tab
+              href = "scenario-template-image.png",
+              target = "_blank",
               tags$img(
                 src = "scenario-template-image.png",
                 style = "max-width: 100%; height: auto; border: 1px solid #ccc; cursor: zoom-in;",
@@ -79,12 +91,11 @@ tab0UI <- function(id) {
             tags$li("Pour faciliter la conversion des estimations de coût unitaire générées à partir de données historiques en valeurs monétaires actuelles, il existe les colonnes supplémentaires suivantes pour faciliter cette tâche : « cout_unitaire_d'origine » l' estimation du coût unitaire d'origine, « cout_unitaire_original_annee » l'année des données utilisées pour estimer le coût unitaire et enfin « facteur_d'inflation_initial_à_l'année_d'analyse » le facteur d'inflation à appliquer pour avoir des coûts unitaires en valeurs attendues actuelles et futures"),
             tags$li("Les colonnes « Notes » et « Source » peuvent être utilisées pour stocker des notes et des détails spécifiques sur la source de données utilisée pour générer les coûts unitaires. ")
           ),
-          # Add image here
           div(
             style = "text-align: center; margin-top: 20px;",
             tags$a(
-              href = "unit-template-image.png", # path relative to www/
-              target = "_blank", # open in new tab
+              href = "unit-template-image.png",
+              target = "_blank",
               tags$img(
                 src = "unit-template-image.png",
                 style = "max-width: 100%; height: auto; border: 1px solid #ccc; cursor: zoom-in;",
@@ -104,6 +115,7 @@ tab0UI <- function(id) {
           p("Une fois qu'une feuille de calcul a été téléchargée dans l'outil, l'utilisateur est capable de télécharger un modèle basé sur un scénario spécifique téléchargé - cela peut faciliter le remplissage rapide d'un nouveau scénario sans avoir à répliquer chaque élément, mais assurez-vous de saisir un nouveau nom et une nouvelle description de scénario lors du rechargement.")
         )
       ),
+      #-SCENARIO VERIFICATION--------
       accordion_panel(
         title = "Vérifier le scénario",
         open = FALSE,
@@ -126,6 +138,7 @@ tab0UI <- function(id) {
           p("Si l'utilisateur détecte des erreurs dans la spécification de la combinaison d'interventions, il peut revenir à l'onglet de téléchargement des données, supprimer la feuille de calcul incorrecte de l'application, corriger la version enregistrée localement et la télécharger à nouveau dans l'application.")
         )
       ),
+      #-BUDGET GEN-----------------
       accordion_panel(
         title = "Générer des budgets",
         open = FALSE,
@@ -147,6 +160,7 @@ tab0UI <- function(id) {
           p("Une fois généré, le nouveau budget restera disponible dans l'outil jusqu'à ce qu'il soit supprimé, ce qui signifie qu'il n'est pas nécessaire de régénérer les budgets à chaque fois qu'un utilisateur accède à l'outil.")
         )
       ),
+      #-BUDGET VISUALISATION--------
       accordion_panel(
         title = "Visualisation du Budget",
         open = FALSE,
@@ -157,6 +171,7 @@ tab0UI <- function(id) {
           p("Faites défiler les résultats restants pour mieux comprendre les différentes ventilations des coûts d'intervention et les facteurs de coût.")
         )
       ),
+      #-BUDGET COMPARISON----------
       accordion_panel(
         title = "Comparaisons budgétaires",
         open = FALSE,
@@ -167,6 +182,7 @@ tab0UI <- function(id) {
           p("Sélectionnez l'année qui vous intéresse et la devise.")
         )
       ),
+      #-REPORT GENERATION-----------
       accordion_panel(
         title = "Génération de rapports",
         open = FALSE,
@@ -174,6 +190,9 @@ tab0UI <- function(id) {
           p("Téléchargez un rapport complet résumant les contributions, les hypothèses et la méthodologie. Il permet également d'accéder à tous les chiffres et données brutes utilisés pour la génération du budget afin de favoriser une transparence et une reproductibilité totales.")
         )
       )
-    )
+    ),
+
+    #-PDF DOWNLOAD INSTRUCTIONS-------------------------------------------------
+    downloadButton(ns("download_inst"), "Télécharger le manuel d'instructions PDF", class = "btn-primary"),
   )
 }

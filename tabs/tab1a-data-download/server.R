@@ -1,22 +1,25 @@
 tab1aServer <- function(input, output, session,
                         template_file_path, SCENARIO_COLS, COST_COLS, TEMPLATE_ADMIN_DATA, shared) {
-  # Add unified shared caches for scenario and cost uploads
-  shared$scenario_uploads_cache <- reactiveVal(NULL)
-  shared$cost_upload_cache <- reactiveVal(NULL)
+  #-DATA MANAGEMENT-------------------------------------------------------------
 
-  # Template file path check
+  # Reactive caches to store uploaded scenarios and cost data across the app
+  shared$scenario_uploads_cache <- reactiveVal(NULL) # Stores all uploaded scenarios
+  shared$cost_upload_cache <- reactiveVal(NULL) # Stores latest uploaded cost data
+
+  # One-time check to ensure the template file exists when app runs
   observe({
     if (!file.exists(template_file_path)) {
       warning(paste("Template file not found:", template_file_path))
     }
   })
 
-  # Initialize reactive values
+  # Trigger reactive refresh (e.g., after a new file is uploaded)
   refresh_trigger <- reactive({
     shared$refresh_trigger
   })
 
-  # Helper functions
+  # FUNCTION: Calculate a unique hash for a file based on its content
+  # Used to identify and prevent duplicate uploads
   calculate_file_hash <- function(file_path) {
     tryCatch(
       {
@@ -33,25 +36,30 @@ tab1aServer <- function(input, output, session,
     )
   }
 
-  # Function to check for duplicate files
+  # FUNCTION: Check if a file with this hash has already been uploaded
+  # Prevents duplicate submissions of the same scenario or cost file
   is_duplicate_file <- function(hash, type = "scenario") {
     if (is.null(hash)) {
-      return(list(is_duplicate = FALSE))
+      return(list(is_duplicate = FALSE)) # Cannot be duplicate if no hash
     }
+    # Connect to the correct upload database
     db_file <- paste0(type, "_uploads.db")
     db <- dbConnect(SQLite(), db_file)
-    on.exit(dbDisconnect(db))
+    on.exit(dbDisconnect(db)) # Ensure DB is closed after function finishes
 
+    # Query for any record with the same hash
     query <- "SELECT name FROM uploads WHERE file_hash = ? LIMIT 1"
     result <- dbGetQuery(db, query, list(hash))
 
+    # Return result as a list with duplication status and name (if applicable)
     list(
       is_duplicate = nrow(result) > 0,
       existing_name = if (nrow(result) > 0) result$name[1] else NULL
     )
   }
 
-  # Load all uploaded scenario metadata (from DB)
+  # FUNCTION: Load all uploaded scenario metadata from the database
+  # Returns a dataframe with all scenario uploads (most recent first)
   load_all_uploaded_scenarios <- function() {
     db <- DBI::dbConnect(RSQLite::SQLite(), "scenario_uploads.db")
     uploads <- DBI::dbGetQuery(db, "SELECT * FROM uploads ORDER BY upload_date DESC")
@@ -59,7 +67,8 @@ tab1aServer <- function(input, output, session,
     uploads
   }
 
-  # Load the latest uploaded cost Excel file as a dataframe
+  # FUNNCTION: Load the most recently uploaded cost file as a dataframe
+  # This is typically used to prefill or review the most current cost assumptions
   load_latest_uploaded_cost <- function() {
     db <- DBI::dbConnect(RSQLite::SQLite(), "cost_uploads.db")
     uploads <- DBI::dbGetQuery(db, "SELECT * FROM uploads ORDER BY upload_date DESC LIMIT 1")
@@ -78,31 +87,36 @@ tab1aServer <- function(input, output, session,
   }
 
 
-  # Scenario template download handler
+  #-SCENARIO TEMPLATE DOWNLOAD HANDLER------------------------------------------
   output$download_scenario_template <- downloadHandler(
+
+    # Define download file name
     filename = function() {
       "scenario_template.xlsx"
     },
+
+    # Define content creation logic for the downloaded file
     content = function(file) {
       tryCatch(
         {
           message("Starting template download...")
           message(paste("Template path:", template_file_path))
 
-          # Use openxlsx instead of openxlsx2
+          # Load the original workbook template
           wb <- openxlsx::loadWorkbook(template_file_path)
 
-          # Get the name of all sheets
+          # Identify sheet names in the original workbook
           original_sheets <- openxlsx::sheets(wb)
-          template_sheet <- original_sheets[1]
+          template_sheet <- "modèle" # this sheet is used as the base to clone
 
-          # Save reference to list-options-ignore sheet if it exists
-          options_sheet_exists <- "list-options-ignore" %in% original_sheets
+          # Check whether the optional options sheet exists
+          options_sheet_exists <- "liste-options-ignorer" %in% original_sheets
 
+          # Determine which years to include (user-specified or default)
           years_to_use <- if (length(input$year_filter) > 0) input$year_filter else DEFAULT_YEARS
           message("Years to use: ", paste(years_to_use, collapse = ", "))
 
-          # Clone the sheet for each selected year
+          # Clone the template sheet for each specified year
           for (year in years_to_use) {
             year_str <- as.character(year)
             message("Creating sheet for year: ", year_str)
@@ -110,7 +124,7 @@ tab1aServer <- function(input, output, session,
             # Clone the template sheet with the year as the name
             openxlsx::cloneWorksheet(wb, year_str, clonedSheet = template_sheet)
 
-            # Verify the sheet was created
+            # Confirm the sheet was added
             if (year_str %in% openxlsx::sheets(wb)) {
               message("Successfully created sheet: ", year_str)
             } else {
@@ -118,16 +132,14 @@ tab1aServer <- function(input, output, session,
             }
           }
 
-          # Remove the template sheet
+          # Remove the original template sheet after cloning
           if (template_sheet %in% openxlsx::sheets(wb)) {
             message("Removing template sheet")
             openxlsx::removeWorksheet(wb, template_sheet)
           }
 
-          # Get current sheets after removing template
+          # Reorder sheets: years first, then options sheet if it exists
           current_sheets <- openxlsx::sheets(wb)
-
-          # Order we want: year sheets first, then list-options-ignore
           desired_order <- c()
 
           # Add year sheets in order
@@ -143,24 +155,31 @@ tab1aServer <- function(input, output, session,
             desired_order <- c(desired_order, "liste-options-ignorer")
           }
 
-          # Reorder the sheets using the setSheetOrder function
-          # Reorder the sheets using the setSheetOrder function
+          # Set the sheet order if it's fully valid
           valid_order <- desired_order[desired_order %in% current_sheets]
           if (length(valid_order) == length(current_sheets)) {
             message("Setting sheet order: ", paste(valid_order, collapse = ", "))
             openxlsx::worksheetOrder(wb) <- match(valid_order, current_sheets)
           } else {
-            message("⚠️ Could not set exact sheet order. Current sheets: ", paste(current_sheets, collapse = ", "))
+            message(
+              "⚠️ Could not set exact sheet order. Current sheets: ",
+              paste(current_sheets, collapse = ", ")
+            )
           }
 
-          # Save the workbook
+          # Save the modified workbook to the specified download path
           openxlsx::saveWorkbook(wb, file, overwrite = TRUE)
 
-          # Verify final order
+          # Log final state for debugging
           final_sheets <- openxlsx::sheets(wb)
           message("Final sheet order: ", paste(final_sheets, collapse = ", "))
-          message("Workbook saved successfully with ", length(final_sheets), " sheets")
+          message(
+            "Workbook saved successfully with ", length(final_sheets),
+            " sheets"
+          )
         },
+
+        # Error handling: show modal dialog on failure
         error = function(e) {
           message(paste("Erreur:", e$message))
           showModal(modalDialog(
@@ -171,25 +190,29 @@ tab1aServer <- function(input, output, session,
         }
       )
     },
-    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    # Define MIME type for Excel files
+    contentType =
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
 
-  # UI for scenario downloads
+  #-DOWNLOAD PREVIOUSLY UPLOADED SCENARIO TEMPLATE------------------------------
   output$scenario_download_ui <- renderUI({
-    # Get list of files
+    # List all uploaded .xlsx scenario files
     scenario_files <- list.files("uploads/scenarios", pattern = "\\.xlsx$")
 
+    # If no files found, show fallback message
     if (length(scenario_files) == 0) {
       return(p("Aucun scénario téléchargé disponible"))
     }
 
-    # Remove .xlsx extension for display
+    # Clean file names for user display (remove .xlsx extension)
     choices <- setNames(
       scenario_files,
       tools::file_path_sans_ext(scenario_files)
     )
 
+    # Return UI elements: select dropdown + download button
     div(
       selectInput(
         session$ns("scenario_to_download"),
@@ -205,37 +228,44 @@ tab1aServer <- function(input, output, session,
     )
   })
 
-  # Download handler for selected scenario
+  #-DOWNLOAD HANDLER: RETURNS SELECTED UPLOADED SCENARIO------------------------
   output$download_selected_scenario <- downloadHandler(
+
+    # File name will be exactly as uploaded (preserve original name)
     filename = function() {
-      input$scenario_to_download # Return the original filename
+      input$scenario_to_download
     },
+    # Copy selected file from uploads directory to output path
     content = function(file) {
       file.copy(
         file.path("uploads/scenarios", input$scenario_to_download),
         file
       )
     },
-    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    # Define correct MIME type for Excel downloads
+    contentType =
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
-  # Make sure the dropdown updates when new files are uploaded
+  #-OBSERVER: RE-RENDERS THE SCENARIO SELECTION UI WHEN NEW FILES UPOLOADED-----
   observeEvent(refresh_trigger(), {
-    # Trigger a rebuild of the UI
+    # Update the dropdown UI dynamically
     output$scenario_download_ui <- renderUI({
-      # Get updated list of files
+      # Get latest list of uploaded scenarios
       scenario_files <- list.files("uploads/scenarios", pattern = "\\.xlsx$")
 
+      # Return fallback if no files exist
       if (length(scenario_files) == 0) {
         return(p("No uploaded scenarios available"))
       }
 
-      # Remove .xlsx extension for display
+      # Clean display names for dropdown
       choices <- setNames(
         scenario_files,
         tools::file_path_sans_ext(scenario_files)
       )
 
+      # Updated UI with select and download
       div(
         selectInput(
           session$ns("scenario_to_download"),
@@ -252,24 +282,31 @@ tab1aServer <- function(input, output, session,
     })
   })
 
-  # Cost template download handler
+
+  #-COST TEMPLATE DOWNLOAD HANDLER----------------------------------------------
   output$download_cost_template <- downloadHandler(
+
+    # File name used for download
     filename = function() {
       "cost_template.xlsx"
     },
+
+    # Content logic to copy and return template
     content = function(file) {
       tryCatch(
         {
           print("Starting cost template download...")
           print(paste("Template path:", cost_template_file_path))
 
-          # Load the original cost template with dropdowns
+          # Load the cost template using openxlsx2 (preserves dropdowns)
           wb <- openxlsx2::wb_load(cost_template_file_path)
 
-          # Save workbook to user download
+          # Save workbook to output file
           openxlsx2::wb_save(wb, file)
           print("Saved cost workbook with dropdowns preserved")
         },
+
+        # Handle and report any errors
         error = function(e) {
           print(paste("Erreur:", e$message))
           showModal(modalDialog(
@@ -280,24 +317,27 @@ tab1aServer <- function(input, output, session,
         }
       )
     },
+    # MIME type for Excel
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
-  # UI for cost downloads
+  #-UI: COST FILE DOWNLOAD DROPDOWN AND BUTTON----------------------------------
   output$cost_download_ui <- renderUI({
-    # Get list of files
+    # Step 1: List all uploaded cost files in the expected folder
     cost_files <- list.files("uploads/costs", pattern = "\\.xlsx$")
 
+    # Step 2: If no cost files exist, show a fallback message
     if (length(cost_files) == 0) {
       return(p("Aucun fichier de coûts téléchargé disponible"))
     }
 
-    # Remove .xlsx extension for display
+    # Step 3: Prepare named list of file choices (remove '.xlsx' from labels)
     choices <- setNames(
       cost_files,
       tools::file_path_sans_ext(cost_files)
     )
 
+    # Step 4: Render the dropdown and download button UI
     div(
       selectInput(
         session$ns("cost_to_download"),
@@ -313,37 +353,44 @@ tab1aServer <- function(input, output, session,
     )
   })
 
-  # Download handler for selected cost file
+  #-DOWNLOAD HANDLER: ALLOW USER TO DOWNLOAD SELECTED COST FILE-----------------
   output$download_selected_cost <- downloadHandler(
+
+    # Define the filename that will be used in the download
     filename = function() {
       input$cost_to_download # Return the original filename
     },
+    # Define how to generate the downloadable content
     content = function(file) {
+      # Copy the selected file from the uploads directory to the download location
       file.copy(
         file.path("uploads/costs", input$cost_to_download),
         file
       )
     },
+    # Set the correct MIME type for Excel files
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
-  # Make sure the dropdown updates when new files are uploaded
+  #-OBSERVER: UPDATE COST DOWNLOAD UI WHEN NEW FILES UPLOADED-------------------
   observeEvent(refresh_trigger(), {
-    # Trigger a rebuild of the UI
+    # Dynamically re-render the UI for cost file downloads
     output$cost_download_ui <- renderUI({
-      # Get updated list of files
+      # List the most recent uploaded cost files
       cost_files <- list.files("uploads/costs", pattern = "\\.xlsx$")
 
+      # If no files are found, show fallback message
       if (length(cost_files) == 0) {
         return(p("No uploaded cost files available"))
       }
 
-      # Remove .xlsx extension for display
+      # Clean the file names for display (remove '.xlsx' extension)
       choices <- setNames(
         cost_files,
         tools::file_path_sans_ext(cost_files)
       )
 
+      # Return updated dropdown and download button UI
       div(
         selectInput(
           session$ns("cost_to_download"),
@@ -360,8 +407,9 @@ tab1aServer <- function(input, output, session,
     })
   })
 
-  # Scenario upload handler
+  #-SCENARIO UPLOAD HANDLER-----------------------------------------------------
   observeEvent(input$submit_scenario, {
+    # Disable scenario upload in demo/lite mode
     if (lite_mode) {
       showModal(modalDialog(
         title = "Feature Disabled",
@@ -372,19 +420,19 @@ tab1aServer <- function(input, output, session,
     }
 
     tryCatch({
+      # STEP 1: Read all sheet names in the uploaded Excel file
       all_sheet_names <- excel_sheets(input$scenario_file$datapath)
 
-      # Keep only sheets with numeric names (i.e. years) for the validation as we have
-      # the list data in here too now
+      # Filter sheets to only include 4-digit numeric names (i.e., years)
       sheet_names <- all_sheet_names[grepl("^\\d{4}$", all_sheet_names)]
 
-      # Validate each sheet
       all_sheets_valid <- TRUE
 
+      # STEP 2: Validate each scenario sheet
       for (sheet in sheet_names) {
         current_data <- read_excel(input$scenario_file$datapath, sheet = sheet)
 
-        # Check column names
+        # --- Validate column structure for scenario template
         if (!identical(colnames(current_data), SCENARIO_COLS)) {
           all_sheets_valid <- FALSE
           removeModal()
@@ -403,7 +451,7 @@ tab1aServer <- function(input, output, session,
           return()
         }
 
-        # Check admin columns
+        # --- Validate admin column values match the template
         admin_cols <- grep("^adm", SCENARIO_COLS, value = TRUE)
         for (col in admin_cols) {
           if (!identical(
@@ -428,7 +476,7 @@ tab1aServer <- function(input, output, session,
           }
         }
 
-        # Check code columns
+        # --- Validate that 'code_' columns contain only 0, 1, or NA
         code_cols <- grep("^code", SCENARIO_COLS, value = TRUE)
         for (col in code_cols) {
           invalid_values <- current_data[[col]][!is.na(current_data[[col]]) &
@@ -451,11 +499,12 @@ tab1aServer <- function(input, output, session,
         }
       }
 
+      # Stop if any validation failed
       if (!all_sheets_valid) {
         return()
       }
 
-      # Create safe filename from scenario name
+      # STEP 3: Create safe filename and avoid duplicates
       safe_name <- gsub("[^[:alnum:]]", "_", input$scenario_name)
       new_filename <- paste0(safe_name, ".xlsx")
       file_path <- file.path("uploads/scenarios", new_filename)
@@ -470,7 +519,7 @@ tab1aServer <- function(input, output, session,
         counter <- counter + 1
       }
 
-      # Calculate file hash and check for duplicates
+      # Check for duplicate file using hash
       file_hash <- calculate_file_hash(input$scenario_file$datapath)
       duplicate_check <- is_duplicate_file(file_hash, "scenario")
 
@@ -487,7 +536,7 @@ tab1aServer <- function(input, output, session,
         return()
       }
 
-      # Only copy the file after all validations are successful
+      # STEP 4: Save file and log metadata to the database
       file.copy(input$scenario_file$datapath, file_path)
 
       # Save to database
@@ -505,7 +554,7 @@ tab1aServer <- function(input, output, session,
       )
       dbDisconnect(db)
 
-      # Reset inputs
+      # STEP 5: Reset inputs and update UI
       updateTextInput(session, session$ns("scenario_name"), value = "")
       updateTextAreaInput(session, session$ns("scenario_description"), value = "")
 
@@ -524,6 +573,7 @@ tab1aServer <- function(input, output, session,
         )
       ))
     }, error = function(e) {
+      # Catch and display unexpected errors
       removeModal()
       showModal(modalDialog(
         title = "Erreur",
@@ -535,8 +585,10 @@ tab1aServer <- function(input, output, session,
     })
   })
 
-  # Cost upload
+
+  #-COST UPLOAD HANDLER---------------------------------------------------------
   observeEvent(input$submit_cost, {
+    # Disable cost upload in demo/lite mode
     if (lite_mode) {
       showModal(modalDialog(
         title = "Feature Disabled",
@@ -547,10 +599,11 @@ tab1aServer <- function(input, output, session,
     }
 
     tryCatch({
+      # STEP 1: Load uploaded cost data and check columns
       current_data <- read_excel(input$cost_file$datapath)
 
-      # Check column names
-      if (!identical(colnames(current_data), COST_COLS)) {
+      # Check column names with the ones that must be there
+      if (!identical(colnames(current_data), COST_COLS_MATCH)) {
         removeModal()
         showModal(modalDialog(
           title = "Erreur",
@@ -566,7 +619,7 @@ tab1aServer <- function(input, output, session,
         return()
       }
 
-      # Create safe filename from cost name
+      # STEP 2: Create a safe and unique file name
       safe_name <- gsub("[^[:alnum:]]", "_", input$cost_name)
       new_filename <- paste0(safe_name, ".xlsx")
       file_path <- file.path("uploads/costs", new_filename)
@@ -581,7 +634,7 @@ tab1aServer <- function(input, output, session,
         counter <- counter + 1
       }
 
-      # Calculate file hash and check for duplicates
+      # Check for duplicates using file hash
       file_hash <- calculate_file_hash(input$cost_file$datapath)
       duplicate_check <- is_duplicate_file(file_hash, "cost")
 
@@ -598,7 +651,7 @@ tab1aServer <- function(input, output, session,
         return()
       }
 
-      # Only copy the file after all validations are successful
+      # STEP 3: Save cost file and insert metadata in DB once checks successful
       file.copy(input$cost_file$datapath, file_path)
 
       # Save to database
@@ -618,10 +671,9 @@ tab1aServer <- function(input, output, session,
         dbDisconnect(db)
       })
 
-      # Reset inputs
+      # STEP 4: Reset UI and trigger refresh
       updateTextInput(session, session$ns("cost_name"), value = "")
       updateTextAreaInput(session, session$ns("cost_description"), value = "")
-
       shared$refresh_trigger <- shared$refresh_trigger + 1
       shared$cost_upload_cache(load_all_uploaded_cost())
 
@@ -636,6 +688,7 @@ tab1aServer <- function(input, output, session,
         )
       ))
     }, error = function(e) {
+      # Catch and display unexpected errors
       removeModal()
       showModal(modalDialog(
         title = "Erreur",
@@ -647,10 +700,12 @@ tab1aServer <- function(input, output, session,
     })
   })
 
-  # Render tables for both Scenario and Cost uploads
+  #-RENDER SCENARIO UPLOADS TABLE WITH DELETE BUTTONS---------------------------
   output$scenario_uploads_table <- renderDT({
+    # Trigger reactivity to refresh table whenever new data is uploaded or deleted
     refresh_trigger()
 
+    # STEP 1: Query scenario uploads from the database
     db <- dbConnect(SQLite(), "scenario_uploads.db")
     uploads <- dbGetQuery(db, "
     SELECT id, name, description, filename, years, upload_date
@@ -659,12 +714,14 @@ tab1aServer <- function(input, output, session,
   ")
     dbDisconnect(db)
 
+    # STEP 2: If uploads exist, render a datatable with delete buttons
     if (nrow(uploads) > 0) {
-      # Add a delete button column with unique IDs for each button
+      # Create a column of HTML delete buttons with data-id attributes
       uploads$actions <- paste0(
         '<button class="btn btn-warning btn-sm delete-btn" data-id="', uploads$id, '">Supprimer</button>'
       )
 
+      # Render the table with the new 'actions' column
       datatable(
         uploads[, c("name", "description", "years", "upload_date", "actions")],
         options = list(
@@ -672,10 +729,10 @@ tab1aServer <- function(input, output, session,
           scrollY = "200px",
           scrollCollapse = TRUE,
           columnDefs = list(
-            list(targets = 4, orderable = FALSE) # Make the actions column not sortable
+            list(targets = 4, orderable = FALSE) # Make the delete button column unsortable
           ),
           language = list(
-            url = "https://cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json"
+            url = "https://cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json" # French translation
           )
         ),
         colnames = c("Nom", "Description", "Années", "Date de téléchargement", "Actes"),
@@ -691,7 +748,10 @@ tab1aServer <- function(input, output, session,
       ")
       ) %>%
         formatDate("upload_date")
-    } else {
+    }
+
+    # STEP 3: If no uploads exist, return an empty table with headers
+    else {
       datatable(
         data.frame(
           Name = character(),
@@ -712,10 +772,12 @@ tab1aServer <- function(input, output, session,
   })
 
 
-  # Render table for cost uploads
+  #-RENDER COST UPLOADS TABLE WITH DELETE BUTTONS-------------------------------
   output$cost_uploads_table <- renderDT({
+    # STEP 1: Trigger reactivity whenever uploads are updated
     refresh_trigger()
 
+    # STEP 2: Query cost uploads from the local SQLite database
     db <- dbConnect(SQLite(), "cost_uploads.db")
     uploads <- dbGetQuery(db, "
     SELECT id, name, description, filename, upload_date
@@ -724,8 +786,9 @@ tab1aServer <- function(input, output, session,
   ")
     dbDisconnect(db)
 
+    # STEP 3: If cost uploads exist, render table with delete buttons
     if (nrow(uploads) > 0) {
-      # Add delete button
+      # Add a column of HTML delete buttons with a unique data-id per row
       uploads$actions <- paste0(
         '<button class="btn btn-warning btn-sm delete-cost-btn" data-id="', uploads$id, '">Supprimer</button>'
       )
@@ -737,10 +800,10 @@ tab1aServer <- function(input, output, session,
           scrollY = "200px",
           scrollCollapse = TRUE,
           columnDefs = list(
-            list(targets = 3, orderable = FALSE) # 'Actions' column not sortable
+            list(targets = 3, orderable = FALSE) # Prevent sorting on the delete button column
           ),
           language = list(
-            url = "https://cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json"
+            url = "https://cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json" # Use French translations
           )
         ),
         colnames = c("Nom", "Description", "Date de téléchargement", "Actes"),
@@ -757,6 +820,7 @@ tab1aServer <- function(input, output, session,
       ) %>%
         formatDate("upload_date")
     } else {
+      # STEP 4: If no cost uploads exist, render an empty placeholder table
       datatable(
         data.frame(
           Name = character(),
@@ -775,8 +839,9 @@ tab1aServer <- function(input, output, session,
     }
   })
 
-  # Observe event delete data
+  #-OBSERVER: SCENARIO DELETE---------------------------------------------------
   observeEvent(input$delete_scenario, {
+    # Check: Prevent deletion in demonstration (lite) mode
     if (lite_mode) {
       showModal(modalDialog(
         title = "Feature Disabled",
@@ -786,27 +851,28 @@ tab1aServer <- function(input, output, session,
       return()
     }
 
+    # Ensure input is present (required trigger)
     req(input$delete_scenario)
-
     print(paste("Triggered delete for scenario ID:", input$delete_scenario))
-
     scenario_id <- input$delete_scenario
 
-    # Connect to DB and get the filename
+    # STEP 1: Connect to the database and retrieve file info
     db <- dbConnect(SQLite(), "scenario_uploads.db")
     file_info <- dbGetQuery(db, "SELECT filename FROM uploads WHERE id = ?", list(scenario_id))
 
+    # STEP 2: If file exists in the DB, attempt deletion
     if (nrow(file_info) > 0) {
       file_path <- file.path("uploads/scenarios", file_info$filename[1])
 
-      # Delete the actual file
+      # Delete physical file from disk
       if (file.exists(file_path)) {
         file.remove(file_path)
       }
 
-      # Remove from the DB
+      # Delete metadata entry from database
       dbExecute(db, "DELETE FROM uploads WHERE id = ?", list(scenario_id))
 
+      # Notify user of success
       showModal(modalDialog(
         title = "Supprimé",
         "Le scénario sélectionné a été supprimé.",
@@ -816,6 +882,7 @@ tab1aServer <- function(input, output, session,
       # Trigger UI refresh
       shared$refresh_trigger <- shared$refresh_trigger + 1
     } else {
+      # STEP 3: File not found in DB – show error
       showModal(modalDialog(
         title = "Erreur",
         "Scénario non trouvé ou déjà supprimé.",
@@ -823,12 +890,16 @@ tab1aServer <- function(input, output, session,
       ))
     }
 
+    # Close DB connection
     dbDisconnect(db)
   })
 
-  # Delete Cost action
+  #-OBSERVER: COST DELETE---------------------------------------------------
   observeEvent(input$delete_cost, {
+    # Ensure input is present (required trigger)
     req(input$delete_cost)
+
+    # Check: Disable cost deletion in lite/demo mode
     if (lite_mode) {
       showModal(modalDialog(
         title = "Feature Disabled",
@@ -837,28 +908,35 @@ tab1aServer <- function(input, output, session,
       ))
       return()
     }
-    cost_id <- input$delete_cost
 
+    # STEP 1: Extract cost ID and query corresponding file from database
+    cost_id <- input$delete_cost
     db <- dbConnect(SQLite(), "cost_uploads.db")
     file_info <- dbGetQuery(db, "SELECT filename FROM uploads WHERE id = ?", list(cost_id))
 
+    # STEP 2: If file exists in DB, proceed with deletion
     if (nrow(file_info) == 1) {
       file_path <- file.path("uploads/costs", file_info$filename)
 
+      # Delete physical Excel file from disk if it exists
       if (file.exists(file_path)) {
         file.remove(file_path)
       }
 
+      # Delete corresponding entry from database
       dbExecute(db, "DELETE FROM uploads WHERE id = ?", list(cost_id))
 
+      # Notify user of successful deletion
       showModal(modalDialog(
         title = "Supprimé",
         "Le fichier de coûts sélectionné a été définitivement supprimé.",
         easyClose = TRUE
       ))
 
+      # Trigger a UI refresh
       shared$refresh_trigger <- shared$refresh_trigger + 1
     } else {
+      # STEP 3: File not found – show error message
       showModal(modalDialog(
         title = "Erreur",
         "Fichier de coûts non trouvé ou déjà supprimé.",
@@ -866,11 +944,13 @@ tab1aServer <- function(input, output, session,
       ))
     }
 
+    # STEP 4: Close the database connection
     dbDisconnect(db)
   })
 
-  # Adding instructions pop up - scenario template
+  #-OBSERVER: Show Modal with SCENARIO Template Instructions--------------------
   observeEvent(input$show_instructions_sc, {
+    # Open modal dialog with guidance for downloading and completing scenario templates
     showModal(modalDialog(
       title = "Instructions détaillées pour télécharger et compléter les modèles",
       easyClose = TRUE,
@@ -888,12 +968,11 @@ tab1aServer <- function(input, output, session,
           tags$li("Les colonnes « code_ » détaillent un type spécifique d'intervention antipaludique qui peut être dispensée, comme suit : 1 = Oui en cours de livraison OU 0/Blanc = Non non livré."),
           tags$li("Les colonnes « type_ » comportent des listes déroulantes permettant de sélectionner le type d'intervention spécifique délivré ")
         ),
-        # Add image here
         div(
           style = "text-align: center; margin-top: 20px;",
           tags$a(
-            href = "scenario-template-image.png", # path relative to www/
-            target = "_blank", # open in new tab
+            href = "scenario-template-image.png",
+            target = "_blank",
             tags$img(
               src = "scenario-template-image.png",
               style = "max-width: 100%; height: auto; border: 1px solid #ccc; cursor: zoom-in;",
@@ -915,8 +994,9 @@ tab1aServer <- function(input, output, session,
     ))
   })
 
-  # instructions pop up unit costs
+  #-OBSERVER: Show Modal with COST Template Instructions--------------------
   observeEvent(input$show_instructions_uc, {
+    # Open modal dialog with guidance for downloading and completing unit cost templates
     showModal(modalDialog(
       title = "Instructions détaillées pour télécharger et compléter les modèles",
       easyClose = TRUE,
@@ -943,12 +1023,11 @@ tab1aServer <- function(input, output, session,
           tags$li("Pour faciliter la conversion des estimations de coût unitaire générées à partir de données historiques en valeurs monétaires actuelles, il existe les colonnes supplémentaires suivantes pour faciliter cette tâche : « cout_unitaire_d'origine » l' estimation du coût unitaire d'origine, « cout_unitaire_original_annee » l'année des données utilisées pour estimer le coût unitaire et enfin « facteur_d'inflation_initial_à_l'année_d'analyse » le facteur d'inflation à appliquer pour avoir des coûts unitaires en valeurs attendues actuelles et futures"),
           tags$li("Les colonnes « Notes » et « Source » peuvent être utilisées pour stocker des notes et des détails spécifiques sur la source de données utilisée pour générer les coûts unitaires. ")
         ),
-        # Add image here
         div(
           style = "text-align: center; margin-top: 20px;",
           tags$a(
-            href = "unit-template-image.png", # path relative to www/
-            target = "_blank", # open in new tab
+            href = "unit-template-image.png",
+            target = "_blank",
             tags$img(
               src = "unit-template-image.png",
               style = "max-width: 100%; height: auto; border: 1px solid #ccc; cursor: zoom-in;",

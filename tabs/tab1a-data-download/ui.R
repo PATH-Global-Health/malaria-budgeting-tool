@@ -1,13 +1,12 @@
 tab1aUI <- function(id) {
-  ns <- NS(id) # Create namespace function for this module instance
+  #-NAMESPACING the module----------------------------
+  ns <- NS(id)
 
+  #-MAIN PAGE CONTENT---------------------------------
   fluidPage(
     useShinyjs(), # Load shinyjs for enabling/disabling or manipulating elements with JS
 
-    # ----------------------------------
-    # Custom JavaScript in the <head>
-    # for restting the scroll
-    # ----------------------------------
+    # Custom JavaScript in the <head> For restting the scroll
     tags$head(
       tags$script("
         function resetScroll() {
@@ -28,29 +27,26 @@ tab1aUI <- function(id) {
       "))
     ),
 
-    # -------------------------------
-    # Yellow warning banner
-    # -------------------------------
+
+    # Yellow message banner at the top (alert-style)
     div(
       style = "background-color: #fff3cd; border-left: 6px solid #ffa500; padding: 15px; margin-bottom: 20px;",
       strong(head_bold),
       main_text
     ),
 
-    # -------------------------------
-    # Scenario Template Section
-    # -------------------------------
+
+    #-SCENARIO TEMPLATE CARD--------------------------------
     card(
       # global card header
       card_header("Modèle de scénario"),
+
       # sidebar layout with sidebar and card body
       layout_sidebar(
-
-        # add the sidebar with input elements
         sidebar = sidebar(
           width = "400px",
 
-          # Instructions - scenarion template only
+          # Instructions - scenario template only
           actionButton(ns("show_instructions_sc"), "📘 Instructions détaillées", class = "btn-info"),
 
           # Select the years of the plan
@@ -59,22 +55,30 @@ tab1aUI <- function(id) {
             selected = 2025:2027,
             multiple = TRUE
           ),
+
           # Download the scenario template
           downloadButton(ns("download_scenario_template"), "Télécharger le modèle de scénario vide", class = "btn-primary"),
+
+          # UI output for download link
           uiOutput(ns("scenario_download_ui")),
           hr(),
+          # File input for uploading scenario files
           fileInput(ns("scenario_file"), "Importer un fichier de scénario", accept = c(".xlsx", ".xls")) |>
             tagAppendAttributes(disabled = lite_mode),
+
+          # Text input for scenario name
           textInput(ns("scenario_name"), "Nom du scénario",
             placeholder = "Donnez un nom à ce scénario"
           ),
+          # Text area input for scenario description
           textAreaInput(ns("scenario_description"), "Description",
             placeholder = "Ajoutez une description (facultatif)"
           ),
+          # Action button to submit the scenario
           actionButton(ns("submit_scenario"), "Soumettre le scénario", class = "btn-primary", disabled = if (lite_mode) NA else NULL)
         ),
 
-        # include the card body with the plots
+        # Include upload histroy
         card(
           card_header("Importations de scénarios précédents"),
           card_body(DTOutput(ns("scenario_uploads_table")))
@@ -83,9 +87,7 @@ tab1aUI <- function(id) {
     ),
 
 
-    # -------------------------------
-    # Cost Template Section
-    # -------------------------------
+    #-COST TEMPLATE CARD--------------------------------
     card(
       # global card header
       card_header("Modèle de coûts"),
@@ -95,25 +97,32 @@ tab1aUI <- function(id) {
         # add the sidebar with input elements
         sidebar = sidebar(
           width = "400px",
-          # Instructions - scenarion template only
+
+          # Instructions - cost template only
           actionButton(ns("show_instructions_uc"), "📘 Instructions détaillées", class = "btn-info"),
 
           # Download template
           downloadButton(ns("download_cost_template"), "Télécharger le modèle de coûts vide", class = "btn-primary"),
+
+          # UI output for download link
           uiOutput(ns("cost_download_ui")),
           hr(),
+          # File input for uploading cost files
           fileInput(ns("cost_file"), "Importer un fichier de coûts", accept = c(".xlsx", ".xls")) |>
             tagAppendAttributes(disabled = lite_mode),
+          # Text input for cost name
           textInput(ns("cost_name"), "Nom de la feuille de coûts",
             placeholder = "Donnez un nom à cette feuille de coûts"
           ),
+          # Text area input for cost description
           textAreaInput(ns("cost_description"), "Description",
             placeholder = "Ajoutez une description (facultatif)"
           ),
+          # Action button to submit the cost
           actionButton(ns("submit_cost"), "Soumettre la feuille de coûts", class = "btn-primary", disabled = if (lite_mode) NA else NULL)
         ),
 
-        # include the card body with the plots
+        # Include upload history
         card(
           card_header("Importations de coûts précédentes"),
           DTOutput(ns("cost_uploads_table"))
@@ -121,9 +130,8 @@ tab1aUI <- function(id) {
       )
     ),
 
-    # -------------------------------
-    # JavaScript for deleting scenarios
-    # -------------------------------
+
+    #-JS FOR DELETE MESSAGE POPUP------------------------
     tags$script(HTML("
       function deleteScenario(id) {
         if (confirm('Êtes-vous sûr de vouloir supprimer définitivement ce scénario ?')) {

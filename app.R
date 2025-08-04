@@ -1,23 +1,18 @@
-#-Packages----------------------------------------------------------------------
+#-PACKAGES----------------------------------------------------------------------
 library(shiny)
 library(bslib)
 library(shinyjs)
 
 
-#-Source UI and server functions for each tab-----------------------------------
-source("global/source-ui-server-code.R")
-source("global/global.R")
-source("global/helpers.R")
-source("global/figure-download.R")
+#-SOURCE SCRIPTS FOR APP RUNNING------------------------------------------------
+source("global/source-ui-server-code.R") # UI and Server code for each tab
+source("global/global.R") # Global variables and constants
+source("global/helpers.R") # Helper functions for the app
+source("global/figure-download.R") # Functions for downloading figures`
 
-# Disable scientific notation globally
-options(scipen = 999)
+options(scipen = 999) # Disable scientific notation globally
 
-# Warning message for demo tool
-head_bold <- "IMPORTANT : Ceci est une version de démonstration de l’outil."
-main_text <- "Les valeurs et les résultats présentés ici sont donnés à titre indicatif uniquement et visent à présenter les fonctionnalités de l'outil. Ils ne doivent pas servir à la prise de décision ni à l'extrapolation. De plus, les données présentées ici ne sont représentatives d'aucun scénario ni coût réel. Notre outil est en cours de développement; la version présentée ici est donc destinée à illustrer les fonctionnalités que nous développons. De nombreuses fonctionnalités sont encore en développement et nous avons hâte de les partager prochainement. N'hésitez pas à nous contacter à hthompson@path.org pour toute suggestion ou commentaire; nous serions ravis de recueillir les avis de notre communauté!"
-
-#-Define UI---------------------------------------------------------------------
+#-DEFINE UI---------------------------------------------------------------------
 ui <- page_navbar(
 
   # Bold header of cards
@@ -26,28 +21,37 @@ ui <- page_navbar(
       font-weight: bold;
     }
   ")),
+  # navbar title
   title = "Application budgétaire paludisme",
+
+  # theming
   theme = bs_theme(
     version = 5,
     bootswatch = "united",
-    # bg = "rgb(100, 16, 59)", # set the foreground colour
-    # fg = "rgb(0, 0, 0)", # set the background colour
-    primary = "#007bc2", # set the primary colour
-    secondary = "#62baff", # set the secondary colour
+    primary = "#007bc2",
+    secondary = "#62baff",
     success = "#3c4856",
     info = "#d6f4ff",
     warning = "#FFD100",
     danger = "#EF3340",
     base_font = font_google("Open Sans")
   ),
+
+  # nav bar options
   navbar_options = navbar_options(
     position = "static-top",
     class = "bg-primary",
     theme = "dark",
     collapsible = TRUE,
   ),
+
+  # page filling
   fillable = FALSE,
+
+  # enable shiny Java Script
   useShinyjs(),
+
+  # include DRC logo in navbar
   tags$script(HTML("
     $(document).ready(function() {
       var img = $('<img>', {
@@ -58,6 +62,8 @@ ui <- page_navbar(
       $('.navbar-nav').parent().append(img);
     });
   ")),
+
+  # formatting dowload buttons
   tags$style(HTML("
     .input-group-btn .btn-default {
       background-color: #62baff !important;
@@ -80,7 +86,7 @@ ui <- page_navbar(
   nav_panel("Comparaisons des budgets", tab4UI("tab4")),
   nav_panel("Génération de rapports", tab5UI("tab5")),
 
-  # Logo in Footer
+  # Logo and description in Footer
   footer = div(
     style = "text-align:center; padding:10px;",
     img(src = "PATH_Logo_Color.png", height = "50px"),
@@ -92,9 +98,9 @@ ui <- page_navbar(
 )
 
 
-#-Define Server-----------------------------------------------------------------
+#-DEFINE SERVER ----------------------------------------------------------------
 server <- function(input, output, session) {
-  #-Shared reactive values for uploads and refresh-----
+  # Shared reactive values for uploads and refresh
   shared <- reactiveValues(
     refresh_trigger = 0,
     budget_results = NULL,
@@ -133,9 +139,9 @@ server <- function(input, output, session) {
     )
   })
 
-  # =Call modules for each tab------------------------
+  #-Call modules for each tab------------------------
   callModule(tab0Server, id = "tab0")
-  callModule(tab1aServer, id = "tab1a", template_file_path, SCENARIO_COLS, COST_COLS, TEMPLATE_ADMIN_DATA, shared = shared)
+  callModule(tab1aServer, id = "tab1a", template_file_path, SCENARIO_COLS, COST_COLS, TEMPLATE_ADMIN_DATA, shared)
   callModule(tab2Server, id = "tab2", shared = shared)
   callModule(tab2aServer, id = "tab2a", shared = shared)
   callModule(tab3Server, id = "tab3", adm2_outline, adm1_outline, shared)
@@ -144,5 +150,5 @@ server <- function(input, output, session) {
   callModule(tab6Server, id = "tab6")
 }
 
-#-Run the App------------------------------------------
+#-RUN APPLICATION---------------------------------------------------------------
 shinyApp(ui, server)

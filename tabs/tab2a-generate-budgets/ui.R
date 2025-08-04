@@ -1,8 +1,11 @@
 tab2aUI <- function(id) {
+  #-NAMESPACING the module----------------------------
   ns <- NS(id)
 
+  #-MAIN PAGE CONTENT---------------------------------
   page_fluid(
-    # warning message
+
+    # Yellow message banner at the top (alert-style)
     div(
       style = "background-color: #fff3cd; border-left: 6px solid #ffa500; padding: 15px; margin-bottom: 20px;",
       strong(head_bold),
@@ -22,19 +25,26 @@ tab2aUI <- function(id) {
     }, {priority: 'event'});
   });
 ")),
-    # titlePanel("Sélections des hypothèses budgétaires"),
+
+
+    # INSTRUCTIONS CARD----------------------------
     layout_columns(
       col_widths = c(2, 2, -6),
+
       # Instructions pop up
       actionButton(ns("show_instructions"), "📘 Instructions détaillées", class = "btn-info"),
 
       # Baseline assumptions pop up
       actionButton(ns("show_assumptions"), "📘 Hypothèses budgétaires", class = "btn-info")
     ),
+
+    # USER PROCESSING CARDS-----------------------------
     layout_columns(
       col_widths = c(7, 5), # Left column wider than right
 
       tagList( # use tagList to keep multiple siblings without wrapping them in a card
+
+        # selection matrix card
         card(
           card_header("Matrice de sélection"),
           p("Sélectionnez les données de plan et de coût à combiner..."),
@@ -45,6 +55,7 @@ tab2aUI <- function(id) {
             actionButton(ns("remove_row"), "Supprimer la dernière ligne", class = "btn-secondary", width = "100%")
           )
         ),
+        # budget generation card
         card(
           card_header("Génération de budget"),
           card_body(
@@ -82,7 +93,7 @@ tab2aUI <- function(id) {
         )
       ),
 
-      # --- RIGHT COLUMN ---
+      # BUDGET HISTORY CARD-----------------------------
       card(
         card_header("Historique de la génération du budget"),
         card_body(

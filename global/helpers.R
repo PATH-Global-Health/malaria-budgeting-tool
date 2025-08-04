@@ -1,9 +1,15 @@
-#-------------------------------------------------------------------------------
-# Helper functions to call into server code to keep streamlined
-#
-#-------------------------------------------------------------------------------
+#-HELPER FUNCTIONS FOR BUDGET GEN APPLICATION-----------------------------------
 
-#-Leaflet intervention mix map--------------------------------------------------
+
+
+#-LEAFLET INTERVENTION MIX MAP--------------------------------------------------
+# Generates an interactive Leaflet map displaying the mix of malaria interventions
+# at the health zone (adm2) level, with optional highlighting for selected provinces
+# or health zones. The map includes:
+#   - Colored polygons for each health zone based on intervention mix
+#   - Province (adm1) boundary outlines
+#   - Labels showing province, zone, and intervention mix
+#   - A legend for the intervention mixes
 create_intervention_leaflet <- function(adm2_outline, adm1_outline,
                                         country_outline, intervention_mix_maps,
                                         spatial_scale, adm1_select,
@@ -12,31 +18,33 @@ create_intervention_leaflet <- function(adm2_outline, adm1_outline,
                                         zoom = 4.5) {
   # Highlight option if adm1 or adm2 is selected
   if (spatial_scale == "Province") {
-    single_highlight <- adm1_outline %>% filter(adm1 == adm1_select)
+    single_highlight <- adm1_outline |> filter(adm1 == adm1_select)
   }
   if (spatial_scale == "Zone de santé") {
-    single_highlight <- adm2_outline %>% filter(adm1 == adm1_select, adm2 == adm2_select)
+    single_highlight <- adm2_outline |> filter(adm1 == adm1_select, adm2 == adm2_select)
   }
 
+  # join intervention data to the shape file
   map_data <-
     left_join(adm2_outline, intervention_mix_maps) |>
-    group_by(adm1, adm2, geometry) %>%
+    group_by(adm1, adm2, geometry) |>
     summarise(
       mix_long = paste(unique(intervention_nice), collapse = " + "),
       .groups = "drop"
-    ) %>%
+    ) |>
     distinct(adm1, adm2, mix_long, geometry)
 
+  # set colour palette
   color_pal <- colorFactor(
-    palette = "Paired", # or use another palette like "Paired", "Dark2"
+    palette = "Paired",
     domain = map_data$mix_long
   )
 
+  # build leaflet map
   map <-
     leaflet() |>
-    # setView(lng = center_lng, lat = center_lat, zoom = zoom) |>
     addTiles() |>
-    # Add adm2 polygons with color based on intervention_summary
+    # Add plan data
     addPolygons(
       data = map_data,
       fillColor = ~ color_pal(mix_long),
@@ -52,7 +60,7 @@ create_intervention_leaflet <- function(adm2_outline, adm1_outline,
       label = ~ sprintf(
         "<strong>%s</strong><br>Province: %s<br>Mix d'intervention: %s",
         adm2, adm1, mix_long
-      ) %>% lapply(htmltools::HTML),
+      ) |> lapply(htmltools::HTML),
       labelOptions = labelOptions(
         direction = "auto",
         textsize = "10px",
@@ -77,6 +85,7 @@ create_intervention_leaflet <- function(adm2_outline, adm1_outline,
       opacity = 0.7
     )
 
+  # Highlight selected adm1 or adm2
   if (spatial_scale %in% c("Province", "Zone de santé")) {
     map <- map |>
       addPolylines(
@@ -91,7 +100,10 @@ create_intervention_leaflet <- function(adm2_outline, adm1_outline,
   map
 }
 
-#-Static Facet intervention maps------------------------------------------------
+#-FACETED INTERVENTION MIX MAP--------------------------------------------------
+# Generates a static faceted ggplot map showing the intervention type for each
+# health zone (adm2), grouped by intervention. Highlights selected provinces or
+# health zones if applicable, based on the selected spatial scale.
 create_static_map <- function(adm2_outline, adm1_outline, filtered_data,
                               plan_select, year_value,
                               spatial_scale,
@@ -99,6 +111,7 @@ create_static_map <- function(adm2_outline, adm1_outline, filtered_data,
                               adm2_select) {
   p <- NULL # Initialize plot variable
 
+  # At national level - no selection hightlight
   if (spatial_scale == "National") {
     static_data <- adm2_outline |>
       left_join(filtered_data)
@@ -117,7 +130,10 @@ create_static_map <- function(adm2_outline, adm1_outline, filtered_data,
         col = "Type d'intervention (si spécifié)",
         title = paste0("Pour: ", year_value)
       )
-  } else if (spatial_scale == "Province" & !is.null(adm1_select)) {
+  }
+
+  # at adm1 - highlight adm1 selected
+  else if (spatial_scale == "Province" & !is.null(adm1_select)) {
     adm1_highlight <- adm1_outline |> dplyr::filter(adm1 == adm1_select)
 
     static_data <- adm2_outline |>
@@ -138,7 +154,10 @@ create_static_map <- function(adm2_outline, adm1_outline, filtered_data,
         col = "Type d'intervention (si spécifié)",
         title = paste0("Pour: ", year_value)
       )
-  } else if (spatial_scale == "Zone de santé" & !is.null(adm2_select)) {
+  }
+
+  # at adm2 - highlight adm2 selected
+  else if (spatial_scale == "Zone de santé" & !is.null(adm2_select)) {
     adm2_highlight <- adm2_outline |> dplyr::filter(adm1 == adm1_select, adm2 == adm2_select)
     static_data <- adm2_outline |>
       left_join(filtered_data)
@@ -162,67 +181,98 @@ create_static_map <- function(adm2_outline, adm1_outline, filtered_data,
   return(p) # Explicitly return the ggplot object
 }
 
-#-summary helper for pop and budget data----------------------------------------
+#-SUMMARY FUNCTION FOR POP AND TOTAL BUDGET----------------------------------------
+# Summarizes budget and population data for a selected geographic and temporal scope.
+# This helper function filters the dataset by spatial scale (National, Province, or
+# Zone de santé), year, and currency, and returns:
+#   - Total budget across all interventions
+#   - Budget per person based on the total population
+#   - Population summary for the selected area and year
 summarise_budget_data <- function(data, pop_data, spatial_scale, adm1_select,
                                   adm2_select, year_select, currency_select) {
-  # Filter budget
+  # Filter budget to selected currency
   budget_filtered <- data |> filter(currency == currency_select)
 
+  # adm1 level data selection
   if (spatial_scale == "Province") {
     budget_filtered <- budget_filtered |> filter(adm1 == adm1_select)
     pop_data <- pop_data |> filter(adm1 == adm1_select)
-  } else if (spatial_scale == "Zone de santé") {
+  }
+  # adm2 level data selection
+  else if (spatial_scale == "Zone de santé") {
     budget_filtered <- budget_filtered |> filter(adm1 == adm1_select, adm2 == adm2_select)
     pop_data <- pop_data |> filter(adm1 == adm1_select, adm2 == adm2_select)
   }
 
+  # Filter budget and population data to the selected year
   if (year_select != "Toutes les années") {
     budget_filtered <- budget_filtered |> filter(year == as.numeric(year_select))
     pop_data <- pop_data |>
       filter(year == as.numeric(year_select)) |>
       summarise(across(starts_with("pop_"), ~ sum(.x, na.rm = TRUE)))
-  } else {
+  }
+
+  # If "all years" is selected, compute the mean population across all years
+  else {
     pop_data <- pop_data |>
       group_by(year) |>
       summarise(across(starts_with("pop_"), ~ sum(.x, na.rm = TRUE))) |>
       summarise(across(everything(), mean, na.rm = TRUE))
   }
 
+  # extract total budget across all interventions as a single value
   total_budget <- budget_filtered |>
     summarise(total_budget = sum(cost_element, na.rm = TRUE)) |>
     pull(total_budget)
+
+  # Compute per-person budget
   total_budget_per_person <- total_budget / pop_data$pop_total
 
+
+  # Return summary metrics as a list
   return(list(
-    total_budget = total_budget,
-    total_budget_per_person = total_budget_per_person,
-    pop_summary = pop_data
+    total_budget = total_budget, # Numeric total cost of all interventions
+    total_budget_per_person = total_budget_per_person, # Cost per person based on total population
+    pop_summary = pop_data # Population summary (either for one year or averaged)
   ))
 }
 
-#-Population summary data---------------------------------------------------------------------------------------
-get_population_summary <- function(target_population, spatial_scale, adm1_select, adm2_select, year_select) {
+#-POPULATION SUMMARY HELPER----------------------------------------------------------------
+# This function filters and summarizes population data based on spatial and year selections.
+# It returns the total population, population under age 5, and pregnant women either for a
+# specific year or averaged across all years.
+get_population_summary <- function(target_population,
+                                   spatial_scale,
+                                   adm1_select,
+                                   adm2_select,
+                                   year_select) {
+  # Start with full dataset
   pop_filtered <- target_population
 
+  # Filter to selected spatial scale
   if (spatial_scale == "Province") {
-    pop_filtered <- pop_filtered %>% filter(adm1 == adm1_select)
+    # Filter by province (adm1)
+    pop_filtered <- pop_filtered |> filter(adm1 == adm1_select)
   } else if (spatial_scale == "Zone de santé") {
-    pop_filtered <- pop_filtered %>% filter(adm1 == adm1_select, adm2 == adm2_select)
+    # Filter by province (adm1) and health zone (adm2)
+    pop_filtered <- pop_filtered |> filter(adm1 == adm1_select, adm2 == adm2_select)
   }
 
+  # If "all years" selected, average population over all years
   if (year_select == "Toutes les années") {
-    pop_summary <- pop_filtered %>%
-      group_by(annee) %>%
+    pop_summary <- pop_filtered |>
+      group_by(annee) |>
       summarise(
-        pop_total = sum(pop_total, na.rm = TRUE),
-        pop_0_5 = sum(pop_0_5, na.rm = TRUE),
-        pop_femme_enceinte = sum(pop_femme_enceinte, na.rm = TRUE),
+        pop_total = sum(pop_total, na.rm = TRUE), # Total population by year
+        pop_0_5 = sum(pop_0_5, na.rm = TRUE), # Children under 5 by year
+        pop_femme_enceinte = sum(pop_femme_enceinte, na.rm = TRUE), # Pregnant women by year
         .groups = "drop"
-      ) %>%
-      summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))
+      ) |>
+      summarise(across(everything(), ~ mean(.x, na.rm = TRUE))) # Take mean across years
   } else {
-    pop_summary <- pop_filtered %>%
-      filter(annee == as.numeric(year_select)) %>%
+    # Filter to selected year and summarise
+    pop_summary <- pop_filtered |>
+      filter(annee == as.numeric(year_select)) |>
       summarise(
         pop_total = sum(pop_total, na.rm = TRUE),
         pop_0_5 = sum(pop_0_5, na.rm = TRUE),
@@ -233,31 +283,45 @@ get_population_summary <- function(target_population, spatial_scale, adm1_select
   return(pop_summary)
 }
 
-#-Ribbon icons function---------------------------------------------------------
+#-VALUE BOX HELPER--------------------------------------------------------------
+# Generates a set of summary icon cards (ribbon-style) for a selected spatial and
+# temporal scope. These cards display:
+#   - Total budget in the selected currency
+#   - Cost per person (based on total population)
+#   - Optional comparison to a user-provided available budget
+# Returns:
+# - A set of bslib::card UI components arranged in a `layout_column_wrap`
 create_icon_summaries <- function(spatial_scale, adm1_select, year_select,
                                   adm2_select, currency_select, available_budget,
                                   data, target_population, ns = identity) {
+  # Set currency symbol for formatting
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
-  # Get population data
-  pop_data <- get_population_summary(target_population, spatial_scale, adm1_select, adm2_select, year_select)
+  # GGet population summary for the selected scope
+  pop_data <- get_population_summary(
+    target_population,
+    spatial_scale,
+    adm1_select,
+    adm2_select,
+    year_select
+  )
 
-  # Calculate cost summary
-  cost_data <- data %>%
-    dplyr::filter(currency == currency_select) %>%
+  # Calculate total budget from filtered budget data
+  cost_data <- data |>
+    dplyr::filter(currency == currency_select) |>
     dplyr::summarise(total_budget = sum(cost_element, na.rm = TRUE))
 
   total_budget <- cost_data$total_budget
   cost_per_person <- total_budget / pop_data$pop_total
 
-  # Conditions
+  # Conditions for showing optional budget comparison card
   show_budget_input <- year_select == "Toutes les années"
   show_budget_comparison <- !is.null(available_budget) && !is.na(available_budget) && show_budget_input
 
-  # Cards
+  # Generate summary cards
   layout_column_wrap(
 
-    # 4. Budget Total
+    # 1. Total Budget Card
     card(
       card_header(tagList(icon("dollar-sign", class = "fa-2x"), " Budget total ", currency_select)),
       card_body(
@@ -266,7 +330,7 @@ create_icon_summaries <- function(spatial_scale, adm1_select, year_select,
       class = "bg-info text-dark"
     ),
 
-    # 5. Cost Per Person
+    # 2. Cost Per Person Card
     card(
       card_header(tagList(icon("calculator", class = "fa-2x"), " Coût par personne ", currency_select)),
       card_body(
@@ -280,7 +344,7 @@ create_icon_summaries <- function(spatial_scale, adm1_select, year_select,
       class = "bg-info text-dark"
     ),
 
-    # 7. Budget Comparison (only after input)
+    # 3. Optional Budget Comparison Card (if all years selected and budget provided)
     if (show_budget_comparison) {
       budget_diff <- available_budget - total_budget
       over <- budget_diff < 0
@@ -294,19 +358,26 @@ create_icon_summaries <- function(spatial_scale, adm1_select, year_select,
           )),
           p(paste("Budget disponible:", formatC(available_budget, format = "f", digits = 0, big.mark = ","), currency_select))
         ),
+        # Conditional coloring: red if over budget, green if under
         style = if (over) "background-color:#dc3545; color:white;" else "background-color:#4CAF50; color:white;"
       )
     }
   )
 }
 
-#-TOTAL COST PROCESSING-------------------------------------------------------------------
+#-TOTAL BUDGET PROCESSING-------------------------------------------------------
+# Filters and aggregates budget data based on the selected spatial level, location,
+# and currency. It summarizes the total cost and target population per intervention,
+# while preserving metadata needed for display and comparison.
+# Returns:
+# - A summarized data frame grouped by plan and intervention, with total costs and
+#   number of provinces (adm1) and health zones (adm2) targeted
 process_budget_data <- function(spatial_scale,
                                 adm1_select,
                                 adm2_select,
                                 currency_select,
                                 data) {
-  # 1) Select the data based on the input selections
+  # 1) Filter data based on spatial level and selected currency
   data <- if (spatial_scale == "National") {
     data |>
       dplyr::filter(
@@ -329,7 +400,7 @@ process_budget_data <- function(spatial_scale,
     return(NULL)
   }
 
-  # 2) Calculate total costs per intervention
+  # 2) Summarize total cost and targeted population per intervention
   data <-
     data |>
     group_by(
@@ -340,16 +411,24 @@ process_budget_data <- function(spatial_scale,
       intervention_nice
     ) |>
     summarise(
-      adm1_targeted = n_distinct(adm1),
-      adm2_targeted = n_distinct(paste(adm1, adm2, sep = "_")),
-      target_pop = round(sum(target_pop, na.rm = TRUE), 0),
-      total_cost = sum(cost_element, na.rm = TRUE)
+      adm1_targeted = n_distinct(adm1), # Number of provinces covered
+      adm2_targeted = n_distinct(paste(adm1, adm2, sep = "_")), # Number of health zones covered
+      target_pop = round(sum(target_pop, na.rm = TRUE), 0), # Total target population
+      total_cost = sum(cost_element, na.rm = TRUE), # Total cost of intervention
+      .groups = "drop"
     )
 
   return(data)
 }
 
-#-Process individual item data------------------------------------------------
+#-PROCESS ITEM BASED BUDGET DATA--------------------------------------------------
+# Filters and aggregates detailed cost data by cost class and unit type for a given
+# intervention and plan. Unlike `process_budget_data()`, which summarizes total cost
+# per intervention, this function provides a more granular view of cost components
+# (e.g., commodities, delivery, fixed costs).
+# Returns:
+# - A grouped and summarized data frame with cost breakdowns by cost class and unit,
+#   per intervention and plan
 process_item_data <- function(spatial_scale,
                               adm1_select,
                               adm2_select,
@@ -378,7 +457,7 @@ process_item_data <- function(spatial_scale,
     return(NULL)
   }
 
-  # 2) Calculate total costs per intervention
+  # 2) Aggregate cost by intervention, cost class, and unit type
   data <-
     data |>
     group_by(
@@ -396,12 +475,20 @@ process_item_data <- function(spatial_scale,
 
 
 #-BUDGET TABLE WITH FORMATTING----------------------------------------------------------
+# Creates a formatted interactive DataTable summarizing budget information for
+# each intervention in a selected plan. Optionally compares with a baseline plan
+# to show differences in total cost, with conditional styling for visual cues.
+#
+# Returns:
+# - A `DT::datatable` object with formatted columns, conditional highlighting,
+#   and French labels
 create_budget_table <- function(processed_data, currency_select, baseline_data = NULL) {
+  # Remove grouping and drop the plan_id column for display
   processed_data <- processed_data |>
     ungroup() |>
     select(-plan_id)
 
-  # Display names for columns
+  # Set display-friendly column labels (French)
   col_names <- c(
     "Plan" = "scenario_name",
     "Description du plan" = "scenario_description",
@@ -416,17 +503,20 @@ create_budget_table <- function(processed_data, currency_select, baseline_data =
     "Coût total" = "total_cost"
   )
 
+  # Set currency symbol for display
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
-  # Add comparison columns if baseline is provided
+  # Comparison logic if a baseline is provided (FOR COMP PAGE)
   if (!is.null(baseline_data)) {
-    baseline_lookup <- baseline_data %>%
-      ungroup() %>%
-      dplyr::select(intervention_nice, total_cost) %>%
+    # Extract total cost per intervention from baseline
+    baseline_lookup <- baseline_data |>
+      ungroup() |>
+      dplyr::select(intervention_nice, total_cost) |>
       dplyr::rename(baseline_total = total_cost)
 
-    processed_data <- processed_data %>%
-      dplyr::left_join(baseline_lookup, by = "intervention_nice") %>%
+    # Join with current data and compute change label
+    processed_data <- processed_data |>
+      dplyr::left_join(baseline_lookup, by = "intervention_nice") |>
       mutate(
         `Différence vs primaire` = case_when(
           is.na(baseline_total) ~ "Nouvelle intervention",
@@ -437,17 +527,17 @@ create_budget_table <- function(processed_data, currency_select, baseline_data =
       )
   }
 
-  # Ensure diff_type is not all NA (needed for styling)
+  # # Ensure clean diff labels (for consistent formatting)
   if (!is.null(baseline_data)) {
-    processed_data <- processed_data %>%
+    processed_data <- processed_data |>
       mutate(`Différence vs primaire` = ifelse(is.na(`Différence vs primaire`), " - ", `Différence vs primaire`))
   }
 
-  # Hide only columns that won’t be used in styling
+  # Identify columns to hide (e.g., intermediate values)
   hidden_cols <- which(names(processed_data) %in% c("baseline_total", "diff_flag"))
   if (length(hidden_cols) == 0) hidden_cols <- NULL
 
-  # Build datatable
+  # Build the DT::datatable
   dt <- DT::datatable(
     processed_data,
     rownames = FALSE,
@@ -462,18 +552,21 @@ create_budget_table <- function(processed_data, currency_select, baseline_data =
         url = "https://cdn.datatables.net/plug-ins/1.13.4/i18n/fr-FR.json"
       )
     )
-  ) %>%
+  ) |>
+    # Set default font size
     DT::formatStyle(
       columns = 1:ncol(processed_data),
       fontSize = "14px"
-    ) %>%
+    ) |>
+    # Format total cost with currency
     DT::formatCurrency(
       columns = "Coût total", # match label!
       currency = currency_symbol,
       interval = 3,
       mark = ",",
       digits = 0
-    ) %>%
+    ) |>
+    # Format population as comma-separated numbers
     DT::formatCurrency(
       columns = c("Population ciblée"),
       currency = "",
@@ -481,9 +574,9 @@ create_budget_table <- function(processed_data, currency_select, baseline_data =
       mark = ","
     )
 
-  # Only apply highlighting if diff_type exists
+  # Apply conditional formatting if differences are available
   if (!is.null(baseline_data) && "Différence vs primaire" %in% names(processed_data)) {
-    dt <- dt %>%
+    dt <- dt |>
       DT::formatStyle(
         "Coût total",
         backgroundColor = DT::styleEqual(
@@ -497,47 +590,47 @@ create_budget_table <- function(processed_data, currency_select, baseline_data =
   dt
 }
 
-#-DONUT CHART-------------------------------------------------------------
+#-DONUT CHART-------------------------------------------------------------------
+# Generates a simple interactive donut chart using the `billboarder` package,
+# showing the distribution of total intervention costs.
+#
+# Returns:
+# - A `billboarder` donut chart object with no title and tooltip enabled.
 donut_plot <- function(data) {
   billboarder() |>
+    # Create donut chart from intervention cost data
     bb_donutchart(
       data = data |>
         ungroup() |>
         arrange(desc(total_cost)) |>
         select(intervention_nice, total_cost)
     ) |>
+    # Remove default title
     bb_title(text = " ", position = "left") |>
+    # Hide legend for cleaner visual
     bb_legend(show = FALSE) |>
+    # Enable tooltips on hover
     bb_tooltip()
 }
 
-#-TREE MAP--------------------------------------------------------------
-treemap_plot <- function(data, currency_select) {
-  currency_symbol <- if (currency_select == "USD") "$" else "FC "
-
-  intervention_totals <-
-    data |>
-    arrange(desc(total_cost))
-
-  plot_ly(
-    data = intervention_totals,
-    type = "treemap",
-    labels = ~intervention_nice,
-    parents = "",
-    values = ~ round(total_cost, 0),
-    textinfo = "label+value",
-    hovertemplate = paste(
-      "<b>%{label}</b><br>",
-      "Coût total: ", currency_symbol, "%{value:,.0f}<br>",
-      "<extra></extra>"
-    )
-  )
-}
-
-#-STACKED BAR PLOT----------------------------------------------------
+#-STACKED BAR PLOT--------------------------------------------------------------
+# Generates an interactive stacked bar plot using `plotly`, displaying the breakdown
+# of total costs per intervention by cost category (e.g., commodities, delivery, fixed).
+# Returns:
+# - A `plotly` stacked bar chart object where:
+#     - X-axis: interventions
+#     - Y-axis: total cost
+#     - Bar segments: cost classes
+#
+# Notes:
+# - Colors are hardcoded for cost classes.
+# - Interventions are reordered by total cost (highest first).
+# - Tooltips show cost class and formatted cost.
 stacked_plot <- function(data, currency_select) {
+  # Set currency symbol for tooltip display
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
+  # Prepare data for stacked bar chart
   proc_impl_split <-
     data |>
     group_by(
@@ -551,9 +644,17 @@ stacked_plot <- function(data, currency_select) {
     ungroup() |>
     mutate(intervention_nice = reorder(intervention_nice, -total_intervention_cost))
 
+  # Define base palette
+  base_colors <- c("#3779E5", "#181D31", "#81CF98", "#B2BABB")
+
+  # Generate extended palette if needed
+  cost_classes <- unique(proc_impl_split$cost_class)
+  palette_colors <- colorRampPalette(base_colors)(length(cost_classes))
+
+  # Create the stacked bar chart using plotly
   plot_ly(
     data = proc_impl_split,
-    colors = c("#3779E5", "#181D31", "#81CF98", "#B2BABB")
+    colors = palette_colors
   ) |>
     add_bars(
       x = ~intervention_nice,
@@ -564,11 +665,11 @@ stacked_plot <- function(data, currency_select) {
         "Coût: ", scales::dollar(cost_element, prefix = currency_symbol)
       ),
       hoverinfo = "text",
-      textposition = "none", # Don't show as a label on bar
-      hoverlabel = list(namelength = -1) # Don't truncate labels
+      textposition = "none",
+      hoverlabel = list(namelength = -1)
     ) |>
     layout(
-      barmode = "stack",
+      barmode = "stack", # Stack bars by cost class
       xaxis = list(
         title = "",
         tickfont = list(size = 12)
@@ -589,10 +690,22 @@ stacked_plot <- function(data, currency_select) {
     )
 }
 
-#-stacked proportional plot-----------------------------------------
+
+#-STACKED INTERVENTION PROPORTION PLOT-------------------------------------------
+# Creates a proportional stacked bar chart using `plotly` to display the relative
+# contribution of each cost class to the total cost per intervention.
+#
+# Returns:
+# - A `plotly` stacked bar chart with:
+#     - X-axis: interventions
+#     - Y-axis: proportional cost breakdown
+#     - Tooltip showing absolute cost and percentage
+#     - Responsive color scale based on cost classes
 stacked_plot_prop <- function(data, currency_select) {
+  # Set currency symbol for display
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
+  # Prepare data with proportional cost per intervention
   proc_impl_split <-
     data |>
     group_by(
@@ -609,9 +722,17 @@ stacked_plot_prop <- function(data, currency_select) {
     ungroup() |>
     mutate(intervention_nice = reorder(intervention_nice, -total_intervention_cost))
 
+  # Define base palette
+  base_colors <- c("#3779E5", "#181D31", "#81CF98", "#B2BABB")
+
+  # Generate extended palette if needed
+  cost_classes <- unique(proc_impl_split$cost_class)
+  palette_colors <- colorRampPalette(base_colors)(length(cost_classes))
+
+  # Build plotly stacked proportional bar chart
   plot_ly(
     data = proc_impl_split,
-    colors = c("#3779E5", "#181D31", "#81CF98", "#B2BABB")
+    colors = palette_colors
   ) |>
     add_bars(
       x = ~intervention_nice,
@@ -649,11 +770,19 @@ stacked_plot_prop <- function(data, currency_select) {
     )
 }
 
-#-lolipop plot for specific elements---------------------------------------------
+#-LOLIPOP CHART FOR INDIVIDUAL COST ELEMENT RANKING-----------------------------
+# Creates a lollipop chart using `plotly` to display the top 15 cost elements
+# across interventions and cost classes. Each point represents a cost component,
+# with lines extending from the y-axis for visual emphasis.
+#
+# Returns:
+# - A `plotly` interactive lollipop plot with color-coded cost classes
+#   and a responsive legend.
 lolipop_plot <- function(data, currency_select) {
+  # Set currency symbol
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
-  # Get top costs and include intervention information
+  # Prepare top 15 cost items
   top_costs <-
     data |>
     arrange(desc(cost_element)) |>
@@ -662,7 +791,13 @@ lolipop_plot <- function(data, currency_select) {
       label = paste0(intervention_nice, " ", cost_class, " coût ", ifelse("unit" %in% names(data), unit, ""))
     )
 
-  plot_ly(colors = c("#3779E5", "#181D31", "#81CF98", "#B2BABB")) |>
+  # Define flexible color palette for cost classes
+  base_colors <- c("#3779E5", "#181D31", "#81CF98", "#B2BABB")
+  cost_classes <- unique(top_costs$cost_class)
+  palette_colors <- colorRampPalette(base_colors)(length(cost_classes))
+
+  plot_ly(colors = palette_colors) |>
+    # Line segments (lollipop stems)
     add_segments(
       data = top_costs,
       x = 0,
@@ -672,6 +807,7 @@ lolipop_plot <- function(data, currency_select) {
       line = list(color = "gray"),
       showlegend = FALSE
     ) |>
+    # Marker circles (lollipop heads)
     add_markers(
       data = top_costs,
       x = ~cost_element,
@@ -686,6 +822,7 @@ lolipop_plot <- function(data, currency_select) {
       ),
       hoverinfo = "text"
     ) |>
+    # Layout customization
     layout(
       xaxis = list(
         title = paste0("Coût (", currency_select, ")"),
@@ -710,15 +847,22 @@ lolipop_plot <- function(data, currency_select) {
     )
 }
 
-#-COST MAP FUNCTION------------------------------------------------------------
+#-COST MAP FUNCTION-------------------------------------------------------------
+# Creates a choropleth map using Leaflet showing either total cost or cost per person
+# by province (adm1) or health zone (adm2). Areas are shaded based on cost values,
+# and tooltips display contextual information.
+#
+# Returns:
+# - A Leaflet map object with shaded polygons and tooltip values
 cost_dist_map <- function(map_level,
                           map_type,
                           adm1_select = NULL,
                           adm2_select = NULL,
                           currency_select,
                           data) {
-  # Format dataset based on map_level
+  # 1. Format population and budget data by spatial level
   if (map_level == "Province") {
+    # Aggregate population by adm1
     pop_data <-
       target_population |>
       group_by(adm1) |>
@@ -726,6 +870,7 @@ cost_dist_map <- function(map_level,
         pop_total = sum(pop_total, na.rm = TRUE)
       )
 
+    # Filter and summarize budget data
     data <-
       data |>
       ungroup() |>
@@ -738,6 +883,7 @@ cost_dist_map <- function(map_level,
       left_join(pop_data) |>
       mutate(total_budget_per_person = total_budget / pop_total)
   } else if (map_level == "Zone de santé") {
+    # Aggregate population by adm1 + adm2
     pop_data <-
       target_population |>
       group_by(adm1, adm2) |>
@@ -745,6 +891,7 @@ cost_dist_map <- function(map_level,
         pop_total = sum(pop_total, na.rm = TRUE)
       )
 
+    # Filter and summarize budget data
     data <-
       data |>
       ungroup() |>
@@ -758,11 +905,11 @@ cost_dist_map <- function(map_level,
       mutate(total_budget_per_person = total_budget / pop_total)
   }
 
-  # Determine which values to map and the legend title
+  # 2. Set legend title
   values <- if (map_type == "total") data$total_budget else data$total_budget_per_person
   title <- if (map_type == "total") "Coût total" else "Coût par personne"
 
-  # Join with shapefiles
+  #  3. Join to the corresponding shapefile
   if (map_level == "Province") {
     data <-
       adm1_outline |>
@@ -773,20 +920,27 @@ cost_dist_map <- function(map_level,
       dplyr::left_join(data)
   }
 
-  # Create label for each feature
-  label_title <-
-    if (map_level == "Province") paste0(data$adm1, ":") else paste0(data$adm1, ", ", data$adm2, ":")
+  # 4. Determine which values to map
+  values <- if (map_type == "total") data$total_budget else data$total_budget_per_person
 
-  # Create color palette
+  # 5. Prepare labels for tooltip
+  label_title <-
+    if (map_level == "Province") {
+      paste0(data$adm1, ":")
+    } else {
+      paste0(data$adm1, ", ", data$adm2, ":")
+    }
+
+  # 6. Create color palette for mapping
   pal <- colorNumeric(
     palette = "RdBu",
     domain = values,
     reverse = TRUE
   )
 
-  # Build base map
-  map <- leaflet(data) %>%
-    addProviderTiles(providers$CartoDB.Positron) %>%
+  # 7. Build leaflet map with polygons, labels, and legend
+  map <- leaflet(data) |>
+    addProviderTiles(providers$CartoDB.Positron) |>
     addPolygons(
       fillColor = ~ pal(values),
       weight = 2,
@@ -802,7 +956,7 @@ cost_dist_map <- function(map_level,
           is_per_person = map_type == "per person"
         )
       )
-    ) %>%
+    ) |>
     addLegend(
       position = "bottomright",
       pal = pal,
@@ -813,10 +967,10 @@ cost_dist_map <- function(map_level,
       )
     )
 
-  # Add highlight if a adm1 is selected and the map is at adm1 level
+  # 8. Optional highlight for selected adm1 or adm2
   if (map_level == "Province" && !is.null(adm1_select)) {
-    adm1_hl <- adm1_outline %>% dplyr::filter(adm1 == adm1_select)
-    map <- map %>%
+    adm1_hl <- adm1_outline |> dplyr::filter(adm1 == adm1_select)
+    map <- map |>
       addPolylines(
         data = adm1_hl,
         color = "red",
@@ -826,10 +980,9 @@ cost_dist_map <- function(map_level,
       )
   }
 
-  # Add highlight if an adm2 is selected and the map is at adm2 level
   if (map_level == "Zone de santé" && !is.null(adm2_select)) {
-    adm2_hl <- adm2_outline %>% dplyr::filter(adm1 == adm1_select, adm2 == adm2_select)
-    map <- map %>%
+    adm2_hl <- adm2_outline |> dplyr::filter(adm1 == adm1_select, adm2 == adm2_select)
+    map <- map |>
       addPolylines(
         data = adm2_hl,
         color = "red",
@@ -842,9 +995,18 @@ cost_dist_map <- function(map_level,
   map
 }
 
+#-HELPER FOR COST SPATIAL MAPS FORMATTING----------------------------------------------
+# Formats numeric cost values for display on maps or tooltips, with currency symbols
+# and proper rounding. If the value is per person, it is rounded to 2 decimal places;
+# otherwise, it is rounded to whole numbers with comma separators.
+#
+# Returns:
+# - A formatted character string with appropriate currency symbol and formatting
 format_cost_label <- function(value, currency_select, is_per_person = FALSE) {
+  # Set currency symbol based on selection
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
+  # Format value based on whether it’s per-person or total
   if (is_per_person) {
     paste0(currency_symbol, round(value, 2))
   } else {
@@ -852,11 +1014,17 @@ format_cost_label <- function(value, currency_select, is_per_person = FALSE) {
   }
 }
 
-#-Budget comparison plot-------------------------------------------------------------------------
-# Cost Comparison Plot
+#-BUDGET COMPARISON TOTALS BARCHART---------------------------------------------
+# Creates an interactive bar chart (via ggplotly) comparing total budgets across
+# different plans. Budgets are displayed in millions, with color-coded bars and
+# formatted tooltips showing plan name and cost.
+# Returns:
+# - A `plotly` interactive bar chart showing total budget per plan
 budget_barchart <- function(data, currency_select) {
+  # Set currency symbol
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
+  # Format data for plotting
   data <- data |>
     mutate(
       budget_millions = round(total_budget / 1e6),
@@ -867,10 +1035,12 @@ budget_barchart <- function(data, currency_select) {
       )
     )
 
+  # Generate color palette based on number of unique plans
   unique_plans <- unique(data$plan_label_wrapped)
   palette_fun <- ggthemes::canva_pal("Fun and tropical")
   colors <- palette_fun(length(unique_plans))
 
+  # Create ggplot object
   p <- ggplot(data, aes(x = plan_label_wrapped, y = budget_millions, fill = plan_label_wrapped, text = hover_text)) +
     geom_bar(stat = "identity", width = 0.6) +
     geom_text(aes(label = paste0(currency_symbol, format(budget_millions, big.mark = ","), "M")),
@@ -883,21 +1053,34 @@ budget_barchart <- function(data, currency_select) {
     guides(fill = "none") +
     scale_fill_manual(values = colors)
 
-  ggplotly(p, tooltip = "text") %>%
+  # Convert to interactive plotly chart
+  ggplotly(p, tooltip = "text") |>
     layout(
       hoverlabel = list(bgcolor = "white"),
       xaxis = list(tickangle = -45)
     )
 }
 
-# cost difference plot-----------------------------------------------------------------------
+#-TOTAL BUDGET DIFFERENCE PLOT---------------------------------------------------
+# Creates an interactive diverging bar (lollipop-style) chart to visualize the
+# difference in total budget (in millions) between each comparison plan and a baseline.
+# Positive changes are shown in red (above budget), and negative in green (savings).
+#
+# Returns:
+# - A `plotly` interactive chart showing cost increases/decreases relative to a baseline
 budget_diff_chart <- function(data, currency_select) {
+  # Set appropriate currency symbol
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
+  # Wrap labels for better vertical display
   data <- data |> mutate(label_wrapped = stringr::str_wrap(label, width = 40))
 
-  p <- ggplot(data, aes(x = difference_millions, y = label_wrapped, text = hover_text)) +
+  # Build static ggplot object
+  p <-
+    ggplot(data, aes(x = difference_millions, y = label_wrapped, text = hover_text)) +
+    # Reference line at zero
     geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    # Diverging segments with conditional color based on budget difference
     geom_segment(aes(x = 0, xend = difference_millions, yend = label_wrapped),
       color = ifelse(data$difference_millions >= 0, "#f88a73", "lightgreen")
     ) +
@@ -911,15 +1094,58 @@ budget_diff_chart <- function(data, currency_select) {
     ) +
     scale_x_continuous(labels = scales::comma)
 
-  ggplotly(p, tooltip = "text") %>%
+  # Convert to interactive plotly chart
+  ggplotly(p, tooltip = "text") |>
     layout(hoverlabel = list(bgcolor = "white"))
 }
 
-#-final cost plot-------------------------------------------------------------------------
-#--- Helper: Process and format data for plotting ----
+#-NUMERICAL HELPER FUNCTION FOR BUDTGET SUMMARY---------------------------------------------
+# Formats numeric cost values (assumed in millions) into a human-readable currency
+# label for display in tooltips, text annotations, or summary outputs. Automatically
+# switches to thousands (e.g., "k") if the value is less than 1 million to avoid
+# displaying "0m" for small values.
+# Returns:
+# - A character string with:
+#     - Values ≥ 1 million shown in millions with appropriate decimal precision and "m" suffix
+#     - Values < 1 million shown in thousands with "k" suffix
+#     - NA or 0 values shown as "0" prefixed by the currency symbol
+#
+# Examples:
+# - format_cost_label_auto(154.2, "$") → "$154m"
+# - format_cost_label_auto(0.743, "$") → "$743k"
+# - format_cost_label_auto(0, "$") → "$0"
+# - format_cost_label_auto(NA, "FC ") → "FC 0"
+format_cost_label_auto <- function(value_millions, currency_symbol) {
+  case_when(
+    is.na(value_millions) ~ paste0(currency_symbol, "0"),
+    value_millions >= 100 ~ paste0(currency_symbol, format(round(value_millions, 0), big.mark = ","), "m"),
+    value_millions >= 10 ~ paste0(currency_symbol, format(round(value_millions, 1), big.mark = ","), "m"),
+    value_millions >= 1 ~ paste0(currency_symbol, format(round(value_millions, 2), big.mark = ","), "m"),
+
+    # If < 1 million, display in thousands
+    value_millions > 0 ~ {
+      value_thousands <- value_millions * 1000
+      paste0(currency_symbol, format(round(value_thousands, 0), big.mark = ","), "k")
+    },
+    TRUE ~ paste0(currency_symbol, "0")
+  )
+}
+
+
+#-HELPER FOR BUDGET COMP INTERVENTION PLOT--------------------------------------
+# Processes and formats budget data for selected plans for final cost comparison plotting.
+# Converts total costs to millions, formats cost labels for display, and computes
+# differences from a baseline plan.
+#
+# Returns:
+# - A list with:
+#     - `data`: a data frame of processed and labeled plan cost data
+#     - `currency_symbol`: symbol based on the selected currency
 prepare_cost_plot_data <- function(plan_select, currency_select, spatial_scale, year_select, baseline_plan) {
+  # Set appropriate currency symbol
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
+  # Process and combine data for each selected comparison budgtet
   dat <-
     purrr::map_df(plan_select, function(plan) {
       process_budget_data(
@@ -927,74 +1153,72 @@ prepare_cost_plot_data <- function(plan_select, currency_select, spatial_scale, 
         adm1_select = NULL,
         adm2_select = NULL,
         currency_select = currency_select
-      ) %>%
+      ) |>
         mutate(plan = plan)
-    }) %>%
+    }) |>
+    # Format total cost and display label
     mutate(
       total_cost = total_cost / 1e6,
-      tc_print = case_when(
-        currency_select == "CDF" ~ paste0(currency_symbol, format(round(total_cost, 0), big.mark = ","), "m"),
-        currency_select == "USD" & total_cost > 60 ~ paste0(currency_symbol, format(round(total_cost, 0), big.mark = ","), "m"),
-        currency_select == "USD" & total_cost <= 60 & total_cost > 1 ~ paste0(currency_symbol, format(round(total_cost, 1), big.mark = ","), "m"),
-        currency_select == "USD" & total_cost <= 1 ~ paste0(currency_symbol, format(round(total_cost, 2), big.mark = ","), "m"),
-        is.na(total_cost) ~ paste0(currency_symbol, "0m")
-      ),
-      total_cost = ifelse(is.na(total_cost), 0, total_cost)
+      total_cost = ifelse(is.na(total_cost), 0, total_cost),
+      tc_print = format_cost_label_millions(total_cost, currency_symbol)
     )
 
-  baseline_data <- dat %>%
-    filter(plan == baseline_plan) %>%
+  # Extract baseline totals for each intervention
+  baseline_data <- dat |>
+    filter(plan == baseline_plan) |>
     select(title, baseline_total = total_cost)
 
-  dat <- dat %>%
-    left_join(baseline_data, by = "title") %>%
+  # Join and flag differences
+  dat <- dat |>
+    left_join(baseline_data, by = "title") |>
     mutate(is_different = total_cost != baseline_total)
 
   return(list(data = dat, currency_symbol = currency_symbol))
 }
 
-#--- Main Plot Function (returns plotly object) ----
+#-INTERVENTION TOTAL COST AND DIFFERNCE BY BUDGET-------------------------------
+# Creates a grouped bar plot (with text labels and tooltips) comparing total intervention
+# costs across a baseline plan and one or more comparison plans.
+#
+# Returns:
+# - An interactive `plotly` bar chart with comparisons by intervention
 generate_final_cost_plot <- function(baseline_processed, comparison_processed, currency_select) {
+  # Set appropriate currency symbol
   currency_symbol <- if (currency_select == "USD") "$" else "FC "
 
-  # Add label column
-  baseline <- baseline_processed %>%
-    mutate(plan_label = plan_id) %>%
+  # Add label and type to distinguish baseline vs. comparisons
+  baseline <- baseline_processed |>
+    mutate(plan_label = plan_id) |>
     mutate(type = "baseline")
 
-  comparisons <- comparison_processed %>%
-    mutate(plan_label = plan_id) %>%
+  comparisons <- comparison_processed |>
+    mutate(plan_label = plan_id) |>
     mutate(type = "comparison")
 
+  # Combine data
   dat <- bind_rows(baseline, comparisons)
 
-  # Get baseline totals for each intervention
-  baseline_totals <- baseline %>%
+  # Get baseline total per intervention for comparison
+  baseline_totals <- baseline |>
     select(intervention_nice, baseline_total = total_cost)
 
-  dat <- dat %>%
-    left_join(baseline_totals, by = "intervention_nice") %>%
+  # Join and format
+  dat <- dat |>
+    left_join(baseline_totals, by = "intervention_nice") |>
     mutate(
       is_different = total_cost != baseline_total,
-      tc_print = case_when(
-        currency_select == "CDF" ~ paste0(currency_symbol, format(round(total_cost, 0), big.mark = ","), "m"),
-        currency_select == "USD" & total_cost > 60 ~ paste0(currency_symbol, format(round(total_cost, 0), big.mark = ","), "m"),
-        currency_select == "USD" & total_cost <= 60 & total_cost > 1 ~ paste0(currency_symbol, format(round(total_cost, 1), big.mark = ","), "m"),
-        currency_select == "USD" & total_cost <= 1 ~ paste0(currency_symbol, format(round(total_cost, 2), big.mark = ","), "m"),
-        is.na(total_cost) ~ paste0(currency_symbol, "0m")
-      ),
-      total_cost = ifelse(is.na(total_cost), 0, total_cost)
-    )
-
-  dat <- dat %>%
+      total_cost = ifelse(is.na(total_cost), 0, total_cost),
+      tc_print = format_cost_label_auto(total_cost, currency_symbol)
+    ) |>
     mutate(intervention_nice = factor(intervention_nice, levels = unique(intervention_nice)))
 
-  # Set palette
+  # Dynamic color palette based on number of plans
   palette_fun <- ggthemes::canva_pal("Fun and tropical")
   plan_colors <- palette_fun(length(unique(dat$plan_label)))
   names(plan_colors) <- unique(dat$plan_label)
 
-  dat <- dat %>%
+  # Add outline and tooltip formatting
+  dat <- dat |>
     mutate(
       outline_color = ifelse(type == "comparison" & is_different, "lightgreen", NA),
       outline_width = ifelse(type == "comparison" & is_different, 1.5, 0)
@@ -1008,7 +1232,7 @@ generate_final_cost_plot <- function(baseline_processed, comparison_processed, c
       )
     )
 
-  # Plot
+  #  Plot with ggplot and convert to plotly
   p <-
     ggplot(
       dat,
@@ -1042,7 +1266,8 @@ generate_final_cost_plot <- function(baseline_processed, comparison_processed, c
     ) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.2)), labels = scales::comma)
 
-  ggplotly(p, tooltip = "text") %>%
+  # Convert to interactive plot
+  ggplotly(p, tooltip = "text") |>
     layout(
       hoverlabel = list(
         bgcolor = "white",
@@ -1052,11 +1277,30 @@ generate_final_cost_plot <- function(baseline_processed, comparison_processed, c
 }
 
 
-# Scenario check functions ----------
 
-# Function to count adm2s receiving and not receiving specific intervention by adm1 and year
+#-HELPER COVERAGE COUNT FUNCTION------------------------------------------------
+# Calculates coverage statistics for a specific intervention within a given plan,
+# summarizing how many health zones (adm2) within each province (adm1) received or
+# did not receive the intervention, either across all years or for a specific year.
+# Returns:
+# - A summary data frame with one row per adm1 (or per adm1-year if year_filter is specific),
+#   containing:
+#     - Year: selected year or "Toutes les années"
+#     - Province: name of the adm1 unit
+#     - Total: number of unique adm2 units in that adm1
+#     - Covered: number of adm2s where `included == 1`
+#     - Uncovered: number of adm2s where `included == 0` or missing
+#     - Coverage %: percentage of adm2s covered (rounded to 1 decimal place)
+#
+# Example usage:
+#   count_adm2_coverage("SMC", "Plan A", "2025", scenario_data)
+#
+# Notes:
+# - If no adm2s are covered in a province, `Covered` will be 0 and `Coverage %` will be 0.
+# - If "Toutes les années" is selected, the count is collapsed across all years.
+# - Works safely with missing coverage data (using `coalesce()`).
 count_adm2_coverage <- function(intervention, plan, year_filter, data) {
-  # Filter down to intervention and plan
+  # ilter the data to selected intervention and plan
   filtered_data <- data |>
     filter(
       intervention == !!intervention,
@@ -1064,29 +1308,34 @@ count_adm2_coverage <- function(intervention, plan, year_filter, data) {
     ) |>
     ungroup()
 
+  # Subset: adm2s that are receiving the intervention (included == 1)
   receiving <- filtered_data |>
     filter(included == 1) |>
     distinct()
 
+  # All distinct adm2s in the plan/intervention combination
   total_adm2s <- filtered_data |>
     distinct()
 
+  # If summarizing across all years
   if (year_filter == "Toutes les années") {
-    # Summarise across all years
+    # Count total adm2s per province (adm1) across all years
     total_summary <- total_adm2s |>
       group_by(adm1) |>
       summarise(total = n_distinct(adm2), .groups = "drop")
 
+    # Count receiving adm2s per province
     receiving_summary <- receiving |>
       group_by(adm1) |>
       summarise(receiving = n_distinct(adm2), .groups = "drop")
 
+    # Join summaries and compute uncovered + coverage %
     summary_table <- total_summary |>
       left_join(receiving_summary, by = "adm1") |>
       mutate(
-        receiving = coalesce(receiving, 0),
-        not = total - receiving,
-        coverage_pct = round(receiving / total * 100, 1),
+        receiving = coalesce(receiving, 0), # Fill missing with 0
+        not = total - receiving, # Calculate uncovered
+        coverage_pct = round(receiving / total * 100, 1), # Calculate %
         year = "Toutes les années"
       ) |>
       select(
@@ -1099,23 +1348,27 @@ count_adm2_coverage <- function(intervention, plan, year_filter, data) {
       ) |>
       arrange(Province)
   } else {
-    # Normal per-year summary
+    # If summarizing for a specific year
+
+    # Count total adm2s per province for the selected year
     total_summary <- total_adm2s |>
       filter(year == year_filter) |>
       group_by(year, adm1) |>
       summarise(total = n_distinct(adm2), .groups = "drop")
 
+    # Count receiving adm2s for the selected year
     receiving_summary <- receiving |>
       filter(year == year_filter) |>
       group_by(year, adm1) |>
       summarise(receiving = n_distinct(adm2), .groups = "drop")
 
+    # Join summaries and compute uncovered + coverage %
     summary_table <- total_summary |>
       left_join(receiving_summary, by = c("year", "adm1")) |>
       mutate(
-        receiving = coalesce(receiving, 0),
-        not = total - receiving,
-        coverage_pct = round(receiving / total * 100, 1)
+        receiving = coalesce(receiving, 0), # Fill missing with 0
+        not = total - receiving, # Calculate uncovered
+        coverage_pct = round(receiving / total * 100, 1) # Calculate %
       ) |>
       select(
         Year = year,
@@ -1128,77 +1381,72 @@ count_adm2_coverage <- function(intervention, plan, year_filter, data) {
       arrange(Year, Province)
   }
 
+  # Return final formatted summary table
   return(summary_table)
 }
 
 
-# smc_pmc_check <- function(plan, year_filter = NULL) {
-#   # Which adm2s are receiving PMC each year
-#   pmc_tmp <- static_mix_maps |>
-#     st_drop_geometry() |>
-#     filter(plan_shortname == !!plan,
-#            intervention == "PMC")
+#-DATA MANAGEMENT Load all uploaded SCENARIO files-----------------------------------------------------
+# Loads and combines all uploaded scenario Excel files stored in a SQLite database
+# and a specified folder. Each Excel file may contain multiple sheets representing
+# different years. Metadata such as scenario name and description is extracted from
+# the database and added to the resulting dataset.
+# Arguments:
+# - db_path: character string specifying the path to the SQLite database
+#            that stores metadata about uploaded scenario files.
+#            Default: "scenario_uploads.db"
+# - folder: character string specifying the folder where the scenario Excel files
+#           are stored. Default: "uploads/scenarios"
 #
-#   # Apply year filter if provided
-#   if (!is.null(year_filter) && length(year_filter) > 0 && !all(is.na(year_filter))) {
-#     pmc_tmp <- pmc_tmp |>
-#       filter(year %in% year_filter)
-#   }
+# Returns:
+# - A data frame combining all uploaded scenario sheets across years and scenarios.
+#   The result includes the following added columns:
+#     - `year`: numeric year (from sheet name)
+#     - `scenario_name`: name of the scenario (from database)
+#     - `scenario_description`: description of the scenario (from database)
 #
-#   pmc_tmp <- pmc_tmp |>
-#     distinct(year, adm1, adm2, intervention)
+# Behavior:
+# - If the database contains no uploads, returns NULL.
+# - If a listed file does not exist or cannot be read, it is skipped.
+# - If a sheet is missing or unreadable, it is skipped.
 #
-#   # Which adm2s are receiving SMC each year
-#   smc_tmp <- static_mix_maps |>
-#     st_drop_geometry() |>
-#     filter(plan_shortname == !!plan,
-#            intervention == "SMC")
-#
-#   # Apply year filter if provided
-#   if (!is.null(year_filter) && length(year_filter) > 0 && !all(is.na(year_filter))) {
-#     smc_tmp <- smc_tmp |>
-#       filter(year %in% year_filter)
-#   }
-#
-#   smc_tmp <- smc_tmp |>
-#     distinct(year, adm1, adm2, intervention)
-#
-#   # Complete join by year, adm1, and adm2
-#   smc_pmc <- inner_join(pmc_tmp, smc_tmp, by = c("year", "adm1", "adm2")) |>
-#     select(year, adm1, adm2)
-#
-#   # If none return message within "None.", otherwise return all SMC and PMC data
-#   if (nrow(smc_pmc) == 0) {
-#     NULL
-#   } else {
-#     smc_pmc
-#   }
-# }
-
-#-data management
-# Load all uploaded scenario files
+# Dependencies:
+# - Requires the following packages: DBI, RSQLite, readxl, purrr
 load_all_uploaded_scenarios <- function(db_path = "scenario_uploads.db", folder = "uploads/scenarios") {
+  # 1. Connect to the SQLite database and fetch metadata about uploaded files
   db <- DBI::dbConnect(RSQLite::SQLite(), db_path)
   uploads <- DBI::dbGetQuery(db, "SELECT name, description, filename, years FROM uploads")
   DBI::dbDisconnect(db)
 
+  # 2. Return NULL early if no uploads are found in the database
   if (nrow(uploads) == 0) {
     return(NULL)
   }
 
+  # 3. Loop over each uploaded scenario file (one row per scenario)
   purrr::map_dfr(seq_len(nrow(uploads)), function(i) {
     row <- uploads[i, ]
+
+    # Build full file path to the Excel file
     file_path <- file.path(folder, row$filename)
+    # Skip if file is missing
     if (!file.exists(file_path)) {
       return(NULL)
     }
 
+    # Split comma-separated year list into individual sheet names
     year_sheets <- unlist(strsplit(row$years, ","))
+
+    # 4. Loop over each year/sheet in the file
     purrr::map_dfr(year_sheets, function(y) {
+      #  Try to read the sheet; fail silently and skip if error
       df <- tryCatch(readxl::read_excel(file_path, sheet = y), error = function(e) NULL)
+
       if (is.null(df)) {
         return(NULL)
       }
+
+      # Add metadata columns for tracking
       df$year <- as.integer(y)
       df$scenario_name <- row$name
       df$scenario_description <- row$description
@@ -1207,95 +1455,159 @@ load_all_uploaded_scenarios <- function(db_path = "scenario_uploads.db", folder 
   })
 }
 
-# Load uploaded cost file
+#-DATA MANAGEMENT Load all uploaded COST files-----------------------------------------------------
+# Loads and combines all uploaded cost Excel files stored in a SQLite database
+# and a specified folder. Each file contains cost data for a specific named
+# cost set, and metadata (name + description) is stored in the database.
+#
+# Arguments:
+# - db_path: character string specifying the path to the SQLite database
+#            containing metadata about uploaded cost files.
+#            Default: "cost_uploads.db"
+# - folder: character string specifying the folder where the Excel files
+#           are physically stored. Default: "uploads/costs"
+#
+# Returns:
+# - A combined data frame of all uploaded cost files with two added columns:
+#     - `cost_name`: name of the cost set (from database)
+#     - `cost_description`: description of the cost set (from database)
+#
+# Behavior:
+# - If no uploads are recorded in the database, returns NULL.
+# - If a file listed in the database is missing or cannot be read, it is skipped.
 load_all_uploaded_costs <- function(db_path = "cost_uploads.db", folder = "uploads/costs") {
+  # 1. Connect to SQLite database and retrieve uploaded cost metadata
   db <- DBI::dbConnect(RSQLite::SQLite(), db_path)
   uploads <- DBI::dbGetQuery(db, "SELECT name, description, filename FROM uploads")
   DBI::dbDisconnect(db)
 
+  # 2. Exit early if no uploads are found
   if (nrow(uploads) == 0) {
     return(NULL)
   }
 
+  # 3. Loop through each uploaded cost file and read the data
   purrr::map_dfr(seq_len(nrow(uploads)), function(i) {
     row <- uploads[i, ]
+
+    # Construct full file path to the Excel file
     file_path <- file.path(folder, row$filename)
+
+    # Skip this file if it does not exist
     if (!file.exists(file_path)) {
       return(NULL)
     }
 
+    # Try to read the Excel file; skip silently if it fails
     df <- tryCatch(readxl::read_excel(file_path), error = function(e) NULL)
     if (is.null(df)) {
       return(NULL)
     }
 
+    # Add metadata from the database as columns in the dataframe
     df$cost_name <- row$name
     df$cost_description <- row$description
     df
   })
 }
 
-# load budget data
+#-DATA MANAGEMENT Load all GENERATED BUDGET DATA files-----------------------------------------------------
+# Loads and combines all previously generated budget `.rds` files, using
+# metadata stored in a history file ("budget_history.rds").
+#
+# Returns:
+# - A combined dataframe of all successfully loaded budget files.
+#   Returns NULL if the history file is missing, empty, or no valid budget
+#   files can be found.
+#
+# Workflow:
+# - Looks for a metadata file: "generated/budget_history.rds"
+# - Each row in the history file should contain a `file_path` to a saved .rds file
+# - Tries to load each listed file; logs warnings for any that are missing
+# - Combines the loaded data frames into a single result
 load_budget_data <- function() {
+  # set expected location of budget history
   history_path <- "generated/budget_history.rds"
 
-  # Check if the history file exists
+  # 1. Check if the history file exists
   if (!file.exists(history_path)) {
     message("No budget history file found")
     return(NULL)
   }
 
-  # Load the history metadata
+  # 2. Read the metadata from the history file
   history <- readRDS(history_path)
 
-  # If empty, return
+  # 3. Validate that metadata is not empty and contains file paths
   if (nrow(history) == 0 || !"file_path" %in% names(history)) {
     message("Budget history is empty or missing 'file_path'")
     return(NULL)
   }
 
-  # Loop through each path and load budget files
+  # 4. Try loading each saved budget file listed in the metadata
   all_budgets <- lapply(history$file_path, function(path) {
     if (file.exists(path)) {
       readRDS(path)
     } else {
       message("Missing budget file: ", path)
-      NULL
+      NULL # Preserve structure if file is missing
     }
   })
 
-  # Filter out failed/missing loads
+  # 5. Remove any NULL results from failed loads
   all_budgets <- all_budgets[!sapply(all_budgets, is.null)]
 
-  # Combine into one dataframe
+  # 6. If none of the files could be loaded, return NULL
   if (length(all_budgets) == 0) {
     message("No valid budget files found")
     return(NULL)
   }
 
+  # 7. Combine all loaded budget data frames into one
   combined <- dplyr::bind_rows(all_budgets)
 
   return(combined)
 }
 
-# Initializes shared caches and provides reload functions
-# Initializes shared caches and provides reload functions
-# Update your initSharedDataManager function
-# Update your initSharedDataManager function
+#-DATA MANAGEMENT SHARED DATA MANAGER ACROSS TABS-------------------------------
+# Initializes and manages shared reactive caches and data stores for uploaded
+# scenarios, costs, and generated budgets within a Shiny app.
+#
+# This function sets up:
+# - Reactive caches for uploaded scenario and cost files
+# - Data frame storage for loaded budget results
+# - Reload helper functions for each dataset
+# - A unified reload_all_uploads() function to refresh everything at once
+#
+# Parameters:
+# - shared: A list-like object (typically `reactiveValues()` or standard list)
+#   used to store shared reactive values and functions across server modules
+#
+# Behavior:
+# - Defines reactiveVal caches for scenarios and costs
+# - Initializes placeholders for budget data
+# - Attaches helper functions to reload each data type from disk
+# - Reload functions should be called from a reactive observer (not inside this function)
 initSharedDataManager <- function(shared) {
-  shared$scenario_uploads_cache <- reactiveVal(NULL)
-  shared$cost_upload_cache <- reactiveVal(NULL)
-  shared$budget_results <- NULL
-  shared$budget_results_available <- FALSE
+  # Reactive caches for scenario and cost uploads
+  shared$scenario_uploads_cache <- reactiveVal(NULL) # Cache for uploaded scenarios
+  shared$cost_upload_cache <- reactiveVal(NULL) # Cache for uploaded costs
 
+  # Non-reactive cache for budget results
+  shared$budget_results <- NULL # Will hold the loaded budget data
+  shared$budget_results_available <- FALSE # Flag for availability
+
+  # Function: Reload scenario files from disk
   shared$reload_scenarios <- function() {
     shared$scenario_uploads_cache(load_all_uploaded_scenarios())
   }
 
+  # Function: Reload cost files from disk
   shared$reload_costs <- function() {
     shared$cost_upload_cache(load_all_uploaded_costs())
   }
 
+  # Function: Reload generated budget data from disk
   shared$reload_budgets <- function() {
     # Load the most recent budget
     budget_data <- load_budget_data()
@@ -1312,46 +1624,114 @@ initSharedDataManager <- function(shared) {
     }
   }
 
+  # Function: Reload all uploads at once
   shared$reload_all_uploads <- function() {
     shared$reload_scenarios()
     shared$reload_costs()
     shared$reload_budgets()
   }
 
-  # DO NOT call reload_all_uploads() directly here
-  # Instead, create an observer to execute it
+  # NOTE:
+  # Do not call shared$reload_all_uploads() here directly.
+  # Trigger it in a reactive context (e.g., observeEvent) to avoid blocking app startup.
 }
 
-# ----------------------------------------------------------------------------
-# process_selections_for_budget(): Pass assumptions
-# ----------------------------------------------------------------------------
+
+#-BUDGET GENERATION - process_selections_for_budget(): Pass assumptions---------
+# Processes a user-defined selection matrix for budget generation by filtering
+# out incomplete rows and attaching the relevant scenario, cost, and assumption
+# data needed for downstream computation.
+#
+# Returns:
+# - A tibble with one row per valid user selection, containing:
+#   - `scen_data`: list-column with filtered scenario data
+#   - `cost_option_data`: list-column with filtered cost data
+#   - `assumptions`: list-column of assumption strings
+#   - `plan_name`, `cost_name`: character names of selections
+#   - `assumptions_used`: string summarizing applied assumptions
+#   - `ready_for_processing`: logical flag (always TRUE)
+#
+# This structure is designed for use in budget quantification pipelines where
+# each row can be passed into a `generate_budget()`-style function.
 process_selections_for_budget <- function(selections, scenario_data, cost_data) {
   selections |>
+    # Filter out incomplete rows (e.g., where plan or cost not selected)
     filter(
       Plan != "Sélectionnez un plan",
       Selected_Cost != "Sélectionnez les coûts"
     ) |>
+    # Process each selection row independently
     rowwise() |>
     mutate(
+      # Attach matching scenario data as a list column
       scen_data = list(scenario_data |> filter(scenario_name == Plan)),
+      # Attach matching cost data as a list column
       cost_option_data = list(cost_data |> filter(cost_name == Selected_Cost)),
+      # Include adjustments as assumptions (list-column)
       assumptions = list(Adjustments),
+      # Store raw names for traceability
       plan_name = Plan,
       cost_name = Selected_Cost,
+      # Collapse assumptions into a readable string (or fallback text)
       assumptions_used = if (length(Adjustments) > 0) {
         paste(unlist(Adjustments), collapse = "; ")
       } else {
         "base de référence"
       },
+      # Flag this row as ready for downstream processing
       ready_for_processing = TRUE
     ) |>
+    # Ensure rowwise context is removed
     ungroup()
 }
 
-#-Generate budget function------------------------------------------------------
+#-BUDGET GENERATION FULL LOGIC------------------------------------------------------
+# Main function that quantifies intervention requirements and costs
+# based on scenario data, cost assumptions, and optional user-defined adjustments.
+#
+#   This function generates a detailed budget dataframe for malaria intervention
+#   planning by quantifying product and service needs and applying unit costs.
+#   It accepts scenario data, cost data, and optional user-defined assumptions
+#   to compute total quantities, unit and delivery costs, and resulting cost
+#   elements across multiple interventions (e.g., ITNs, IPTp, SMC, PMC, vaccination).
+#   The output includes detailed costing at the health zone (adm2) level
+#
+# Arguments:
+#   scen_data    : A dataframe containing the intervention implementation scenario,
+#                  including variables such as `adm1`, `adm2`, `year`,
+#                  `scenario_name`, `scenario_description`, and intervention codes
+#                  (e.g., `code_smc`, `code_iptp`, etc.).
+#
+#   cost_data    : A dataframe of unit cost and delivery cost information,
+#                  including variables like `cout_classe`, `cout_monnaie_locale`,
+#                  `cout_usd`, `code_intervention`, and `cout_annee_pour_analyse`.
+#
+#   assumptions  : A character vector of optional user-specified assumption changes
+#                  (e.g., "CPS : population cible = Enfants de moins de 10 ans").
+#                  If no assumptions are provided, default values are used.
+#
+# Returns:
+#   A dataframe containing the detailed calculated budget, including:
+#     - Spatial and temporal coverage (adm1, adm2, year)
+#     - Scenario and cost metadata
+#     - Quantified population and product requirements
+#     - Unit costs (local and USD), cost categories, and delivery units
+#     - Calculated cost elements in both currencies
+#     - Intervention type and readable labels
+#     - Fixed costs (e.g., trainings) included at national level
+#     - Assumption summaries and a unique `plan_id` for traceability
+#
+# Notes:
+#   - This function handles both standard and adjusted cost assumptions.
+#   - All quantities and costs are calculated at the health zone (adm2) level,
+#     except for fixed costs, which apply nationally.
+#   - Assumptions are parsed from strings using the format `Key = Value`.
+#   - Appropriate population columns are selected based on user assumptions.
+#   - Final output is suitable for display, download, and comparison in a
+#     Shiny dashboard or reporting tool.
 generate_budget <- function(scen_data, cost_data, assumptions) {
-  #-SUMMARY------------------------------------------------------------------------------
   # Print a summary of the interventions and number of adm1s/adm2s being targeted
+  # in the console
   cat("Costing scenario being generated for the following mix of interventions:")
   print(
     scen_data |>
@@ -1371,7 +1751,7 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
   )
   cat(scen_data$scenario_description[1])
 
-  #-Update cost data for processing------------------------------------------------------
+  # Update cost data to account for used or missing cost year values
   cost_data <-
     cost_data |>
     filter(!is.na(cout_monnaie_locale)) |>
@@ -1394,7 +1774,7 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
     ) |>
     filter(cost_year == year)
 
-  #-Assumption variables------------------------------------------------------------------
+  # extract assumption variables
   assumptions <- unlist(assumptions)
 
   # Target population data already loaded / passed
@@ -1443,7 +1823,7 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
   vacc_doses_per_child <- get_assumption("Vaccination : nombre de doses", 4)
   vacc_wastage <- get_assumption("Vaccination : marge pour l’approvisionnement", 1.1)
 
-  # Extraire la colonne de population cible selon l'hypothèse
+  # Extract specific population assumptions due to named list nature
   get_pop_column <- function(varname, default_col) {
     pop_assumption <- assumption_list[[varname]]
     if (is.null(pop_assumption)) {
@@ -1474,14 +1854,14 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
     }
   }
 
-  # Extraire les colonnes de population spécifiques
+  # Extract specific population columns
   itn_campaign_pop_col <- get_pop_column("Campagne MII : population cible", "pop_total")
   itn_routine_pop_col <- get_pop_column("Routine MII : population cible", c("pop_0_5", "pop_femme_enceinte"))
   smc_pop_col <- get_pop_column("CPS : population cible", "pop_0_5")
 
-  #-Generate quantifications---------------------------------------------------------------
+  # QUNATIFICATION LOGIC
 
-  #-ITN CAMPAIGNS--------------------------------
+  # ITN CAMPAIGNS
   itn_campaign_quantifications <-
     scen_data |>
     select(
@@ -1534,7 +1914,7 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
       )
     )
 
-  #-ITN ROUTINE-------------------------------
+  # ITN ROUTINE
   itn_routine_quantifications <-
     scen_data |>
     select(
@@ -1586,11 +1966,7 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
     )
 
 
-  #-IPTp-------------------------------------
-  ## Assumptions - three doses
-  ## of SP (in blister packs of 3 pills)
-  ## targeted ANC attendence at 80%
-  ## coverage with a 10% buffer stock
+  # IPTp
   iptp_quantifications <-
     scen_data |>
     select(
@@ -1638,25 +2014,7 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
     )
 
 
-  #-SMC-----------------------------------------
-  ## Since SMC is delivered in two dosage groups:
-  ## 3 to <12 months and >12 to 59 months,
-  ## the number of packets for each age group needs to be
-  ##  quantified and then multiplied by 4, to cover every
-  ##  cycle.  In addition, a buffer stock between
-  ##  10 -20% should be included to accommodate for loss,
-  ##  re-dosing and treatment of children from neighbouring locations.
-  ##  Calculation:
-  ##    A. Total number of children under 5.
-  ##    B. Number of children 3 to <12 months = (18% of A)
-  ##    C. 10% buffer stock for children 3 to <12 months = (10% of B)
-  ##    D. Total number of packets for children 3 to <12 months needed for one cycle of SMC = (B + C)
-  ##    E. Total number of packets for children 3 to <12 months needed for one round of SMC = (4 x D)
-  ##    F. Number of children >12 to 59 months = (77% of A)
-  ##    G. 10% buffer stock for children >12 to 59 months = (10% of F)
-  ##    H. Total number of packets for children >12 to 59 months needed for one cycle of SMC = (F + G)
-  ##    I. Total number of packets for children >12 to 59 months needed for one round of SMC = (4 x H)
-
+  # SMC
   # check if expanded age range is included
   include_5_10 <- any(grepl("10", smc_pop_col))
 
@@ -1720,19 +2078,7 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
       )
     )
 
-  #-PMC-----------------------------------------------------------
-  # Assumptions
-  # Antigen coverage rate = 85% (since immunization is being
-  # used as the contact point).
-  # children 0-1 take 1 tab
-  # children 1-2 take 2 tab
-  # Since one in four children/infants in Nigeria is underweight),
-  # 25% of children <1 year will take half instead of one tablet,
-  #  while 25% of children 1-2 years will take one instead of 2 tablets.
-  #  A factor of 0.75% was therefore used to quantify the required SP
-  #  for each age group.
-  #  There will be 4 touch points within a calendar year for PMC
-  #  With a 10% buffer added
+  # PMC
   pmc_quantification <-
     scen_data |>
     select(
@@ -1785,11 +2131,7 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
     )
 
 
-  #-Vaccine----------------------------------------------------
-  ## Assumptions
-  ## 84% coverage
-  ## 10% wasatge
-  ## 4 doses per child
+  # VACCINE
   vacc_quantification <-
     scen_data |>
     select(
@@ -1838,7 +2180,7 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
       )
     )
 
-  # to handle instances where no intervention targeted
+  # To handle instances where no intervention targeted
   safe_quantification <- function(df) {
     if (nrow(df) == 0) {
       tibble(
@@ -1853,10 +2195,10 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
   }
 
 
-  #-CASE MANAGEMENT-----------------------------------------------------------------
+  # CASE MANAGEMENT / IRS / MDA ETC
   # NEED TO WAIT UNTIL METHODS OF QUANTIFICATION ARE SHARED
 
-  #-Combine into one dataframe-----------------------------------------------------
+  # COMBINE QUANTIFICATION DATA INTO ONE DATA FRAME
   budget <-
     bind_rows(
       safe_quantification(itn_campaign_quantifications),
@@ -1987,10 +2329,14 @@ generate_budget <- function(scen_data, cost_data, assumptions) {
   return(budget_final)
 }
 
-#-safe ID handler
+#-BUDGET GEN HELPER - ASSUMPTIONS HANDLING--------------------------------------
+#   This utility function sanitizes a character label to produce a "safe" ID
+#   that can be used in HTML or Shiny input/output element names. It ensures
+#   that the resulting string contains only alphanumeric characters and
+#   underscores, making it compatible with Shiny's UI element IDs.
 safe_id <- function(label) {
-  label %>%
-    gsub("[^a-zA-Z0-9_]", "_", .) %>%
-    gsub("_+", "_", .) %>%
-    gsub("^_|_$", "", .)
+  cleaned <- gsub("[^a-zA-Z0-9_]", "_", label)
+  cleaned <- gsub("_+", "_", cleaned)
+  cleaned <- gsub("^_|_$", "", cleaned)
+  return(cleaned)
 }

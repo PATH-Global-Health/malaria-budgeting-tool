@@ -1,16 +1,8 @@
 tab2aServer <- function(input, output, session, shared) {
   ns <- session$ns
 
-  # # ----------------------------------------------------------------------------
-  # # SAFELY INITIALIZE SHARED REFRESH TRIGGER
-  # # ----------------------------------------------------------------------------
-  # if (is.null(isolate(shared$refresh_trigger))) {
-  #   shared$refresh_trigger <- reactiveVal(0)
-  # }
 
-  # ----------------------------------------------------------------------------
-  # INSTRUCTIONS POP UP
-  # ----------------------------------------------------------------------------
+  #-INSTRUCTIONS POP UP---------------------------------------------------------
   observeEvent(input$show_instructions, {
     showModal(modalDialog(
       title = "Instructions détaillées pour Générer des budgets",
@@ -37,9 +29,8 @@ tab2aServer <- function(input, output, session, shared) {
     ))
   })
 
-  # ----------------------------------------------------------------------------
-  # BUDGET ASSUMPTIONS POP UP
-  # ----------------------------------------------------------------------------
+
+  #-BUDGET ASSUMPTIONS POP UP---------------------------------------------------
   observeEvent(input$show_assumptions, {
     showModal(modalDialog(
       title = "Informations détaillées sur les hypothèses clés pour l'élaboration du budget",
@@ -149,9 +140,8 @@ tab2aServer <- function(input, output, session, shared) {
     ))
   })
 
-  # ----------------------------------------------------------------------------
+  #-DATA HANDLING MISC----------------------------------------------------------
   # NULL OPERATOR AND SAFE ACCESSOR
-  # ----------------------------------------------------------------------------
   `%||%` <- function(a, b) if (!is.null(a)) a else b
   get_safe <- function(lst, i) {
     if (is.null(lst)) {
@@ -160,9 +150,8 @@ tab2aServer <- function(input, output, session, shared) {
     if (length(lst) >= i) lst[[i]] else NULL
   }
 
-  # ----------------------------------------------------------------------------
+
   # INITIAL REACTIVE VALUES
-  # ----------------------------------------------------------------------------
   row_count <- reactiveVal(1) # matrix row selections
   stored_selections <- reactiveVal(list( # Store selected values across UI redraws
     plans = list(),
@@ -175,9 +164,8 @@ tab2aServer <- function(input, output, session, shared) {
   budget_generating <- reactiveVal(FALSE) # Budget generation status
   incomplete_rows <- reactiveVal(integer(0)) # check if incomplete rows are trying to be processed
 
-  # ----------------------------------------------------------------------------
-  # BUDGET HISTORY
-  # ----------------------------------------------------------------------------
+
+  # BUDGET HISTORY SET UP
   budget_history <- reactiveVal(data.frame( # Budget history table
     date_generated = character(), # Date/time budget was generated
     scenario = character(), # Scenario name
@@ -189,8 +177,9 @@ tab2aServer <- function(input, output, session, shared) {
     stringsAsFactors = FALSE
   ))
 
+  # ON START UP LOAD BUDGET HISTORY IF IT EXISTS
   observe({
-    if (!dir.exists("generated")) dir.create("generated", showWarnings = FALSE) # On startup, load budget history if it exists
+    if (!dir.exists("generated")) dir.create("generated", showWarnings = FALSE)
     history_path <- "generated/budget_history.rds"
     if (file.exists(history_path)) {
       history <- tryCatch(readRDS(history_path), error = function(e) NULL)
@@ -198,9 +187,8 @@ tab2aServer <- function(input, output, session, shared) {
     }
   })
 
-  # ----------------------------------------------------------------------------
+
   # REFRESH DATA WHEN SHARED REFRESH TRIGGER FIRES
-  # ----------------------------------------------------------------------------
   observeEvent(shared$refresh_trigger,
     {
       message("🔄 Refreshing data in tab2a...")
@@ -209,9 +197,10 @@ tab2aServer <- function(input, output, session, shared) {
     ignoreInit = FALSE
   )
 
-  # ----------------------------------------------------------------------------
+
   # REACTIVE UPLOAD DATA SOURCES
-  # ----------------------------------------------------------------------------
+  # These will be used to populate the selection matrix
+  # Scenario
   scenario_data <- reactive({
     cache <- shared$scenario_uploads_cache
     if (is.null(cache) || !is.reactive(cache)) {
@@ -220,6 +209,7 @@ tab2aServer <- function(input, output, session, shared) {
     cache()
   })
 
+  # Cost
   cost_data <- reactive({
     cache <- shared$cost_upload_cache
     if (is.null(cache) || !is.reactive(cache)) {
@@ -228,14 +218,15 @@ tab2aServer <- function(input, output, session, shared) {
     cache()
   })
 
+  # Check if data is available for matrix UI
   data_available <- reactive({
     !is.null(scenario_data()) && nrow(scenario_data()) > 0 &&
       !is.null(cost_data()) && nrow(cost_data()) > 0
   })
 
-  # ----------------------------------------------------------------------------
-  # MATRIX UI
-  # ----------------------------------------------------------------------------
+
+  #-SELECTION MATRIX UI-------------------------------------------------------
+  # Render the selection matrix UI
   output$matrix_ui <- renderUI({
     req(stored_selections())
     if (!data_available()) {
@@ -248,13 +239,16 @@ tab2aServer <- function(input, output, session, shared) {
       )
     }
 
+    # Ensure we have valid data and row count
     req(cost_data(), scenario_data(), row_count())
     num_rows <- row_count()
     if (num_rows <= 0) num_rows <- 1
 
+    # Prepare choices for plans, costs, and assumptions
     plan_choices <- c("Sélectionnez un plan", unique(scenario_data()$scenario_name))
     cost_choices <- c("Sélectionnez les coûts", unique(cost_data()$cost_name))
 
+    # Assumption variables and choices
     assumption_vars <- c(
       "Campagne MII : personnes par moustiquaire",
       "Campagne MII : population cible",
@@ -281,10 +275,13 @@ tab2aServer <- function(input, output, session, shared) {
       "Vaccination : marge pour l’approvisionnement"
     )
 
+    # Assumption choices
     assumption_choices <- c("Sélectionnez une hypothèse", "Accepter la base de référence", "Faire des ajustements")
 
+    # Get stored selections
     stored <- stored_selections()
 
+    # Generate the selection matrix UI
     table_header <- div(
       style = "display: table-row; font-weight: bold; background: #eaeaea;",
       div(style = "display: table-cell; width:8%;  border:1px solid #ccc; padding:5px;", "Spécification"),
@@ -295,18 +292,20 @@ tab2aServer <- function(input, output, session, shared) {
       div(style = "display: table-cell; width:25%; border:1px solid #ccc; padding:5px;", "Résumé ajustements")
     )
 
+    # Generate table rows based on the number of rows added
     table_rows <- lapply(1:num_rows, function(i) {
       is_invalid <- i %in% incomplete_rows()
       row_style <- if (is_invalid) {
-        "display: table-row; background-color: #ffe6e6;" # light red
+        "display: table-row; background-color: #ffe6e6;" # light red if selections are not complete
       } else {
         "display: table-row;"
       }
+      # Get current selections or default placeholders
       selected_plan <- get_safe(stored$plans, i) %||% "Sélectionnez un plan"
       selected_cost <- get_safe(stored$costs, i) %||% "Sélectionnez les coûts"
       selected_assumption <- get_safe(stored$assumptions, i) %||% "Sélectionnez une hypothèse"
 
-
+      # Create the row with selections and dynamic inputs
       div(style = row_style, list(
         div(
           style = "display: table-cell; width:8%; border:1px solid #ccc; padding:5px; font-weight:bold;",
@@ -314,7 +313,7 @@ tab2aServer <- function(input, output, session, shared) {
             HTML(paste0("Budget ", i, if (is_invalid) " ⚠️")),
             actionLink(
               ns(paste0("clear_row_", i)),
-              icon("broom", style = "color: #888;"), # light grey
+              icon("broom", style = "color: #888;"),
               style = "margin-left: 8px;",
               title = "Réinitialiser cette ligne"
             )
@@ -350,6 +349,7 @@ tab2aServer <- function(input, output, session, shared) {
       ))
     })
 
+    # place in UI
     tagList(
       div(
         id = "matrix_container",
@@ -364,9 +364,8 @@ tab2aServer <- function(input, output, session, shared) {
   })
 
 
-  # ----------------------------------------------------------------------------
-  # TRACK SELECTIONS
-  # ----------------------------------------------------------------------------
+
+  #-TRACK SELECTIONS------------------------------------------------------------
   observe({
     req(row_count())
     current <- stored_selections()
@@ -378,9 +377,8 @@ tab2aServer <- function(input, output, session, shared) {
     stored_selections(current)
   })
 
-  # ----------------------------------------------------------------------------
-  # DYNAMIC INPUTS FOR ADJUSTMENTS
-  # ----------------------------------------------------------------------------
+
+  #-DYNAMIC INPUTS FOR ADJUSTMENTS----------------------------------------------
   observe({
     lapply(1:row_count(), function(i) {
       output[[paste0("dynamic_input_", i)]] <- renderUI({
@@ -433,9 +431,8 @@ tab2aServer <- function(input, output, session, shared) {
     })
   })
 
-  # ----------------------------------------------------------------------------
-  # ADD ADJUSTMENTS
-  # ----------------------------------------------------------------------------
+
+  #-STORE ADJUSTMENTS-----------------------------------------------------------
   observe({
     lapply(1:row_count(), function(i) {
       observeEvent(input[[paste0("submit_adjust_", i)]], {
@@ -483,9 +480,8 @@ tab2aServer <- function(input, output, session, shared) {
     })
   })
 
-  # ----------------------------------------------------------------------------
-  # INLINE SUMMARY WITH INDIVIDUAL REMOVE LINKS
-  # ----------------------------------------------------------------------------
+
+  #-INLINE SUMMARY WITH INDIVIDUAL REMOVE LINKS---------------------------------
   observe({
     lapply(1:row_count(), function(i) {
       output[[paste0("summary_inline_", i)]] <- renderUI({
@@ -511,9 +507,8 @@ tab2aServer <- function(input, output, session, shared) {
     })
   })
 
-  # ----------------------------------------------------------------------------
-  # REMOVE INDIVIDUAL ADJUSTMENTS
-  # ----------------------------------------------------------------------------
+
+  #-HANDLER TO REMOVE INDIVIDUAL ADJUSTMENTS------------------------------------
   observe({
     current <- stored_selections()
 
@@ -527,36 +522,36 @@ tab2aServer <- function(input, output, session, shared) {
             hashed <- digest(paste(ii, text))
             btn_id <- paste0("remove_adj_", hashed)
 
-            observeEvent(input[[btn_id]], {
-              updated <- stored_selections()
-              adj_vec <- updated$adjustments[[ii]]
-              updated$adjustments[[ii]] <- adj_vec[adj_vec != text]
-              stored_selections(updated)
-            }, ignoreInit = TRUE)
+            observeEvent(input[[btn_id]],
+              {
+                updated <- stored_selections()
+                adj_vec <- updated$adjustments[[ii]]
+                updated$adjustments[[ii]] <- adj_vec[adj_vec != text]
+                stored_selections(updated)
+              },
+              ignoreInit = TRUE
+            )
           })
         })
       }
     })
   })
 
-  # ----------------------------------------------------------------------------
-  # ADD ROW BUTTON
-  # ----------------------------------------------------------------------------
+
+  #-ADD ROW BUTTON--------------------------------------------------------------
   observeEvent(input$add_row, {
     row_count(row_count() + 1)
   })
 
-  # ----------------------------------------------------------------------------
-  # REMOVE ROW BUTTON
-  # ----------------------------------------------------------------------------
+
+  #-REMOVE ROW BUTTON-----------------------------------------------------------
   observeEvent(input$remove_row, {
     req(row_count() > 1)
     row_count(row_count() - 1)
   })
 
-  # ----------------------------------------------------------------------------
-  # CLEAR ROW SELECTIONS
-  # ----------------------------------------------------------------------------
+
+  #-CLEAR ROW SELECTIONS--------------------------------------------------------
   observe({
     lapply(1:row_count(), function(i) {
       observeEvent(input[[paste0("clear_row_", i)]], {
@@ -578,9 +573,8 @@ tab2aServer <- function(input, output, session, shared) {
     })
   })
 
-  # ----------------------------------------------------------------------------
-  # DISABLE MATRIX UI WHEN GENERATING
-  # ----------------------------------------------------------------------------
+
+  # -ISABLE MATRIX UI WHEN GENERATING BUDGET------------------------------------
   observe({
     if (budget_generating()) {
       shinyjs::disable("matrix_container")
@@ -589,11 +583,7 @@ tab2aServer <- function(input, output, session, shared) {
     }
   })
 
-
-
-  # ----------------------------------------------------------------------------
-  # GENERATE BUDGETS
-  # ----------------------------------------------------------------------------
+  #-GENERATE BUDGETS------------------------------------------------------------
   observeEvent(input$generate_budgets, {
     # if lite version of tool turned on - set this message to show
     if (lite_mode) {
@@ -613,6 +603,7 @@ tab2aServer <- function(input, output, session, shared) {
     budget_generating(TRUE)
     shinyjs::show("loading_container")
 
+    #
     on.exit(
       {
         budget_generating(FALSE)
@@ -641,6 +632,7 @@ tab2aServer <- function(input, output, session, shared) {
     # Save to reactiveVal
     incomplete_rows(invalid_rows)
 
+    # modal message if invalid selections
     if (length(invalid_rows) > 0) {
       showModal(modalDialog(
         title = "Champs manquants",
@@ -658,6 +650,7 @@ tab2aServer <- function(input, output, session, shared) {
       return()
     }
 
+    # store matrix selections
     matrix_data <- lapply(1:n_rows, function(i) {
       list(
         plan = input[[paste0("row_plan_", i)]],
@@ -667,11 +660,11 @@ tab2aServer <- function(input, output, session, shared) {
       )
     })
 
+    # process matrix selections
     matrix_selections(matrix_data)
 
     # Notify user and start progress bar
     showNotification("Début de la génération des budgets...", type = "message", duration = NULL)
-
 
     # Run through each budget generation process
     withProgress(message = "Génération en cours", detail = "Traitement des budgets...", value = 0, {
@@ -685,7 +678,7 @@ tab2aServer <- function(input, output, session, shared) {
         scen <- scenario_data() |> filter(scenario_name == row$plan)
         cost <- cost_data() |> filter(cost_name == row$cost)
 
-        # gnerate the budget
+        # generate the budget
         tryCatch(
           {
             budget_df <- generate_budget(
@@ -718,6 +711,8 @@ tab2aServer <- function(input, output, session, shared) {
             results[[i]] <- budget_df
             history_entries[[i]] <- entry
           },
+
+          # error notification handler
           error = function(e) {
             showNotification(
               paste("Erreur lors de la génération du budget pour", row$plan, ":", e$message),
@@ -736,7 +731,7 @@ tab2aServer <- function(input, output, session, shared) {
         budget_history(rbind(budget_history(), new_history))
         saveRDS(budget_history(), "generated/budget_history.rds")
 
-        # Share for other tabs
+        # Sharer for across other tabs
         budget_results(combined_budgets)
         shared$budget_results <- combined_budgets
         shared$budget_results_available <- TRUE
@@ -744,21 +739,22 @@ tab2aServer <- function(input, output, session, shared) {
         # Trigger reactive refresh
         shared$refresh_trigger <- shared$refresh_trigger + 1
 
+        # success notification
         showNotification(
           paste(length(results), "budgets générés avec succès."),
           type = "message",
           duration = NULL
         )
       } else {
+        # failure notification
         showNotification("Aucun budget valide n’a été généré.", type = "warning")
       }
     })
   })
 
 
-  # ----------------------------------------------------------------------------
-  # RENDER BUDGET HISTORY TABLE
-  # ----------------------------------------------------------------------------
+
+  #-RENDER BUDGET HISTORY TABLE-------------------------------------------------
   output$budget_history_table <- renderDT({
     df <- budget_history()
     df$date_generated <- format(as.Date(df$date_generated), "%Y-%m-%d")
@@ -811,15 +807,14 @@ tab2aServer <- function(input, output, session, shared) {
       var path = $(this).data('path');
       Shiny.setInputValue('%s', path, {priority: 'event'});
     });",
-          ns("confirm_delete_path") # 👈 correctly namespace the input ID
+          ns("confirm_delete_path")
         )
       )
     )
   })
 
-  # ----------------------------------------------------------------------------
-  # DELETE SELECTED BUDGET FILE WITH FEEDBACK
-  # ----------------------------------------------------------------------------
+
+  #-DELETE BUDGET OBSERVER WITH FEEDBACK----------------------------------------
   observeEvent(input$confirm_delete_path, {
     showModal(modalDialog(
       title = "Confirmer la suppression",
@@ -833,9 +828,8 @@ tab2aServer <- function(input, output, session, shared) {
     shared$path_to_delete <- input$confirm_delete_path
   })
 
-  # ----------------------------------------------------------------------------
-  # FINAL DELETE
-  # ----------------------------------------------------------------------------
+
+  #-FINAL DELETE HANDLER--------------------------------------------------------
   observeEvent(input$confirm_delete_yes, {
     removeModal()
 
@@ -859,7 +853,7 @@ tab2aServer <- function(input, output, session, shared) {
       budget_history(hist)
       saveRDS(hist, "generated/budget_history.rds")
 
-      # ✅ BONUS: Also remove from shared$budget_results
+      # Also remove from shared$budget_results
       if (!is.null(shared$budget_results)) {
         shared$budget_results <- shared$budget_results %>% filter(file_path != path)
       }
