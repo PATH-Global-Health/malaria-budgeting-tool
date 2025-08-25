@@ -1,9 +1,0 @@
-.Rproj.user
-.Rhistory
-.RData
-.Ruserdata
-
-# Don't include uploaded local Excel or db files
-#uploads/
-#scenario_uploads.db
-#cost_uploads.db
